@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import numpy as np
+import sys;
 
 import matplotlib.pyplot as plt
 
@@ -36,6 +37,8 @@ batch_size, state_size, t_size, sim_duration = 3, 1, 100, 20
 sde = SDE_1D()
 ts = torch.linspace(0, sim_duration, t_size)
 y0 = torch.full(size=(batch_size, state_size), fill_value=0.1)
+
+sys.setrecursionlimit(5000)
 
 with torch.no_grad():
     ys = torchsde.sdeint(sde, y0, ts, method='euler')  # (t_size, batch_size, state_size) = (100, 3, 1).
