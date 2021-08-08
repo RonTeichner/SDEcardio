@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import numpy as np
 
 import matplotlib.pyplot as plt
 
@@ -32,9 +33,9 @@ class SDE_1D(nn.Module):
     def g(self, t, y):
         return 0.3 * torch.sigmoid(torch.cos(t) * torch.exp(-y))
 
-batch_size, state_size, t_size = 3, 1, 100
+batch_size, state_size, t_size, sim_duration = 3, 1, 100, 20
 sde = SDE_1D()
-ts = torch.linspace(0, 1, t_size)
+ts = torch.linspace(0, sim_duration, t_size)
 y0 = torch.full(size=(batch_size, state_size), fill_value=0.1)
 
 with torch.no_grad():
