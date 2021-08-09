@@ -1,6 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+from scipy.optimize import root
 import numpy as np
 from scipy.linalg import solve_continuous_are
 
@@ -28,7 +29,7 @@ class DoyleSDE(torch.nn.Module):
 
         self.noiseStd = torch.tensor([0, 0, 0, 0])  # for state_size=4
 
-        Pas_L, Pvs_L, Pap_L, O2v_L, W_L, H_L = 77.5, 4.250, 11.6, 154/1000, 0, 41
+        Pas_L, Pvs_L, Pap_L, O2v_L, W_L, H_L = 82, 4.250, 11.6, 154/1000, 100, 41
         x_L, W_L, H_L = torch.tensor([Pas_L, Pvs_L, Pap_L, O2v_L], dtype=torch.float)[:, None], torch.tensor([W_L], dtype=torch.float)[:, None], torch.tensor([H_L], dtype=torch.float)[:, None]
 
         # x_L is [state_size, 1], W_L is [input_size, 1], H_L is [control_size, 1]
@@ -205,6 +206,18 @@ class DoyleSDE(torch.nn.Module):
     def calc_dx(self, t, x, *args):
         dx = self.f(torch.tensor(t), torch.tensor(x, dtype=torch.float)[None, :])
         return dx.numpy()[0]
+
+    def rootWrapper(self, x, *args):
+        paramsDict = args[0]
+        t=0 # not in use
+        return self.calc_dx(t, x.tolist(), paramsDict)
+
+    def calcFixedPoint(self):
+        enableControllerOrigVal = self.enableController
+        self.enableController = False  # Now H has the value of H_L, W has the value of d(t=0)
+        fixedPoint = root(self.rootWrapper, self.referenceValues["x_L"].numpy()[:, 0], self.paramsDict)
+        self.enableController = enableControllerOrigVal
+        return fixedPoint.x
 
     # Drift
     def f(self, t, x):
