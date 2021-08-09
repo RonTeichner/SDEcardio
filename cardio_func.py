@@ -1,21 +1,34 @@
 import torch
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+import numpy as np
 from scipy.linalg import solve_continuous_are
 
 class DoyleSDE(torch.nn.Module):
 
-    def __init__(self):
+    def __init__(self, d, d_tVec):
         super().__init__()
+        self.d = d  # [Watt] d is the workload input of shape # [time-vec, batchSize, 1]; the time-vec should be dense
+        self.d_tVec = d_tVec
+
         self.noise_type = "diagonal"
         self.sde_type = "ito"
 
         self.paramsDict = self.DoyleParams()
         self.state_size = 4
         self.control_size = 1
-        self.input_size = 1
+        self.input_size = self.d.shape[2]
+
+        self.enableController = True
+
+        self.solveIvpRun = False
+        self.solveIvpRunBatchNo = 0
+
+        self.dotFactor = 1/60  # all units are in minutes
 
         self.noiseStd = torch.tensor([0, 0, 0, 0])  # for state_size=4
 
-        Pas_L, Pvs_L, Pap_L, O2v_L, W_L, H_L = 92, 0, 0, 0, 0, 0
+        Pas_L, Pvs_L, Pap_L, O2v_L, W_L, H_L = 77.5, 4.250, 11.6, 154/1000, 0, 41
         x_L, W_L, H_L = torch.tensor([Pas_L, Pvs_L, Pap_L, O2v_L], dtype=torch.float)[:, None], torch.tensor([W_L], dtype=torch.float)[:, None], torch.tensor([H_L], dtype=torch.float)[:, None]
 
         # x_L is [state_size, 1], W_L is [input_size, 1], H_L is [control_size, 1]
@@ -26,9 +39,10 @@ class DoyleSDE(torch.nn.Module):
 
     def DoyleParams(self):
         heartParamsDict = {
-            # parameters for subject 1
-            "c_l": 0.03,    #  [L / mmHg]
-            "c_r": 0.05     #  [L / mmHg]
+            # parameters for subject 1 cl,cr = 0.03, 0.05
+            # parameters for subject 2 cl,cr = 0.025, 0.045
+            "c_l": 0.025,    #  [L / mmHg]
+            "c_r": 0.045     #  [L / mmHg]
         }
 
         circulationParamsDict = {
@@ -47,13 +61,14 @@ class DoyleSDE(torch.nn.Module):
         }
 
         controlParamsDict = {
+            # parameters for subject 1,2 @ 0-50 Watt:
             "q_as": 30,         # weighting factor, [1 / mmHg]
             "q_o2": 100000,     # weighting factor, [L blood / L O2]
             "q_H": 1            # weighting factor, [1 / min]
         }
 
         displayParamsDict = {
-            "fs": 100  # [Hz] - figures time resolution
+            "fs": 1.0  # [Hz] - figures time resolution
         }
 
         paramsDict = {
@@ -65,18 +80,24 @@ class DoyleSDE(torch.nn.Module):
 
         return paramsDict
 
-    def algebricEquations(self, x, d):
+    def algebricEquations(self, x, u, d):
         # x is the state vector: [batch_size, state_size, 1], [Pas, Pvs, Pap, O2v]
+        # u is the control: [batch_size, control_size, 1]
         # d is the workload input: [batch_size, input_size, 1], [W]
 
         Pas, Pvs, Pap, O2v = x[:, 0:1, 0:1], x[:, 1:2, 0:1], x[:, 2:3, 0:1], x[:, 3:4, 0:1]
         W = d
+        H = u
+
+        if self.solveIvpRun:
+            W = W[self.solveIvpRunBatchNo:self.solveIvpRunBatchNo+1]
 
         # Pas, Pvs, Pap, O2v, W are of shape [batch_size, 1, 1]
 
-        circulationParamsDict = self.paramsDict["circulationParamsDict"]
+        heartParamsDict, circulationParamsDict = self.paramsDict["heartParamsDict"], self.paramsDict["circulationParamsDict"]
         c_as, c_vs, c_ap, c_vp = circulationParamsDict["c_as"], circulationParamsDict["c_vs"], circulationParamsDict["c_ap"], circulationParamsDict["c_vp"]
         V_tot, A, R_s0, rho, M_0, R_p, O_2a, V_TO2 = circulationParamsDict["V_tot"], circulationParamsDict["A"], circulationParamsDict["R_s0"], circulationParamsDict["rho"], circulationParamsDict["M_0"], circulationParamsDict["R_p"], circulationParamsDict["O_2a"], circulationParamsDict["V_TO2"]
+        c_l, c_r = heartParamsDict["c_l"], heartParamsDict["c_r"]
 
         Vvp = V_tot - (c_as*Pas + c_vs*Pvs + c_ap*Pap)
         Pvp = torch.div(Vvp, c_vp)
@@ -84,8 +105,10 @@ class DoyleSDE(torch.nn.Module):
         Fs, Fp = torch.div(Pas - Pvs, Rs), torch.div(Pap - Pvp, R_p)
         M = rho*W + M_0
         delta_O2 = O_2a - O2v
+        Q_l = c_l*H*Pvp
+        Q_r = c_r*H*Pvs
 
-        return Pvp, Rs, Fs, Fp, M, delta_O2
+        return Pvp, Rs, Fs, Fp, M, delta_O2, Q_l, Q_r
 
     def calc_gain_K(self, referenceValues):
         A_L, B_L = self.calc_A_L_B_L(referenceValues)
@@ -117,7 +140,7 @@ class DoyleSDE(torch.nn.Module):
         V_tot, A, R_s0, rho, M_0, R_p, O_2a, V_TO2 = circulationParamsDict["V_tot"], circulationParamsDict["A"], circulationParamsDict["R_s0"], circulationParamsDict["rho"], circulationParamsDict["M_0"], circulationParamsDict["R_p"], circulationParamsDict["O_2a"], circulationParamsDict["V_TO2"]
         c_l, c_r = heartParamsDict["c_l"], heartParamsDict["c_r"]
 
-        Pvp_L, Rs_L, Fs_L, Fp_L, M_L, delta_O2_L = self.algebricEquations(x_L[None, :, :], d_L[None, :, :])
+        Pvp_L, Rs_L, Fs_L, Fp_L, M_L, delta_O2_L, Q_l, Q_r = self.algebricEquations(x_L[None, :, :], u_L[None, :, :], d_L[None, :, :])
         Pvp_L, Rs_L, Fs_L, Fp_L, M_L, delta_O2_L = Pvp_L.squeeze(), Rs_L.squeeze(), Fs_L.squeeze(), Fp_L.squeeze(), M_L.squeeze(), delta_O2_L.squeeze()
 
         A_L, B_L = torch.zeros(self.state_size, self.state_size), torch.zeros(self.state_size, 1)
@@ -151,12 +174,37 @@ class DoyleSDE(torch.nn.Module):
         # d_L is the reference workload input: [input_size, 1], [W]
         # u_L is the reference heart rate at low exercise [control_size, 1], [H]
 
-        K = self.K
-        x_L, H_L = x_L[None, :, :].repeat(batch_size, 1, 1), u_L[None, :, :].repeat(batch_size, 1, 1)
+        if self.enableController:
+            K = self.K
+            x_L, H_L = x_L[None, :, :].repeat(batch_size, 1, 1), u_L[None, :, :].repeat(batch_size, 1, 1)
 
-        u = - torch.matmul(K, x) + self.controlBias[None, :, :].repeat(batch_size, 1, 1)
-        # u is the control [batch_size, control_size, 1]
+            u = - torch.matmul(K, x) + self.controlBias[None, :, :].repeat(batch_size, 1, 1)
+            # u is the control [batch_size, control_size, 1]
+        else:
+            u = u_L[None, :, :].repeat(batch_size, 1, 1)
         return u
+
+    def runSolveIvp(self, x_0, simDuration):
+        self.solveIvpRun = True
+        batchSize = x_0.shape[0]
+        solList = list()
+        for b in range(batchSize):
+            self.solveIvpRunBatchNo = b
+            solList.append(solve_ivp(self.calc_dx, [0, simDuration], x_0[b].tolist(), args=[self.paramsDict], dense_output=True, rtol=1e-4))
+
+        fs = self.paramsDict["displayParamsDict"]["fs"]
+        tVec = np.linspace(0, simDuration - 1 / fs, int(fs * simDuration))
+
+        x_k = np.zeros((tVec.shape[0], batchSize, self.state_size))
+        for b, sol in enumerate(solList):
+            x_k[:, b] = np.transpose(sol.sol(tVec))
+
+        self.solveIvpRun = False
+        return torch.tensor(x_k, dtype=torch.float)
+
+    def calc_dx(self, t, x, *args):
+        dx = self.f(torch.tensor(t), torch.tensor(x, dtype=torch.float)[None, :])
+        return dx.numpy()[0]
 
     # Drift
     def f(self, t, x):
@@ -164,7 +212,9 @@ class DoyleSDE(torch.nn.Module):
         # d is the workload input: [batch_size, 1], [W]
 
         batch_size = x.shape[0]
-        W = torch.full((batch_size, self.input_size), 0)
+
+        dIndex = torch.argmin(torch.abs(self.d_tVec - t))
+        W = self.d[dIndex]
 
         Pas, Pvs, Pap, O2v = x[:, 0:1, None], x[:, 1:2, None], x[:, 2:3, None], x[:, 3:4, None]
 
@@ -173,15 +223,14 @@ class DoyleSDE(torch.nn.Module):
         V_tot, A, R_s0, rho, M_0, R_p, O_2a, V_TO2 = circulationParamsDict["V_tot"], circulationParamsDict["A"], circulationParamsDict["R_s0"], circulationParamsDict["rho"], circulationParamsDict["M_0"], circulationParamsDict["R_p"], circulationParamsDict["O_2a"], circulationParamsDict["V_TO2"]
         c_l, c_r = heartParamsDict["c_l"], heartParamsDict["c_r"]
 
-        Pvp, Rs, Fs, Fp, M, delta_O2 = self.algebricEquations(x[:, :, None], d=W[:, :, None])
         H = self.calcControl(x[:, :, None])
+        Pvp, Rs, Fs, Fp, M, delta_O2, Q_l, Q_r = self.algebricEquations(x[:, :, None], u=H, d=W[:, :, None])
 
-        dot_Pas = (1/c_as)*(c_l*torch.matmul(H, Pvp) - Fs)
-        dot_Pvs = (1/c_vs)*(Fs - c_r*torch.matmul(H, Pvs))
-        dot_Pap = (1/c_ap)*(c_r*torch.matmul(H, Pvs) - Fp)
-        dot_O2v = (1/V_TO2)*(-M + torch.matmul(Fs, delta_O2))
 
-        torch.cat((dot_Pas, dot_Pvs, dot_Pap, dot_O2v), dim=1)
+        dot_Pas = self.dotFactor*(1/c_as)*(Q_l - Fs)
+        dot_Pvs = self.dotFactor*(1/c_vs)*(Fs - Q_r)
+        dot_Pap = self.dotFactor*(1/c_ap)*(Q_r - Fp)
+        dot_O2v = self.dotFactor*(1/V_TO2)*(-M + torch.matmul(Fs, delta_O2))
 
         return torch.cat((dot_Pas, dot_Pvs, dot_Pap, dot_O2v), dim=1)[:, :, 0]  # shape (batch_size, state_size)
 
@@ -190,5 +239,69 @@ class DoyleSDE(torch.nn.Module):
     def g(self, t, x):
         batch_size = x.shape[0]
         return self.noiseStd[None, :].repeat(batch_size, 1)
+
+    def plot(self, x_k):
+        # x_k shape (nSamples, batch_size, state_size)
+        nSamples, batch_size = x_k.shape[0], x_k.shape[1]
+        # recalc the control:
+        u_k = torch.zeros(nSamples, batch_size, self.control_size, dtype=torch.float)
+        for k in range(nSamples):
+            u_k[k] = self.calcControl(x_k[k][:, :, None])[:, :self.control_size, 0]
+
+        x_k[:, :, 3] = 1000*x_k[:, :, 3] # to converts the units from [L O2 / L blood] to [mL O2 / L blood]
+
+        x_u_k = torch.cat((x_k, u_k), dim=2)
+        x_u_k = x_u_k.cpu().numpy()
+
+        tVec = np.arange(0, nSamples)/self.paramsDict["displayParamsDict"]["fs"]
+
+        ylabels = ["Pas", "Pvs", "Pap", "O2v", "HR", "W"]
+        colors = ['magenta', 'yellow', 'yellow', 'green', 'black', 'blue']
+        plt.figure(figsize=(16, 12))
+        for s in range(self.state_size + self.control_size + self.input_size):
+            plt.subplot(2, 3, s+1)
+            for b in range(batch_size):
+                if s == (self.state_size + self.control_size + self.input_size - 1):
+                    plt.plot(self.d_tVec, self.d[:, b, 0], label=f'sample {s}')
+                else:
+                    plt.plot(tVec, x_u_k[:, b, s], label=f'sample {s}')
+
+            plt.xlabel('sec')
+            plt.ylabel(ylabels[s])
+            plt.legend()
+            plt.grid()
+
+        sList = [0, 3, 4, 5]
+        for b in range(batch_size):
+            plt.figure()
+            for s in sList:
+                if s == 5:
+                    plt.plot(self.d_tVec, self.d[:, b, 0], label=ylabels[s], color=colors[s])
+                else:
+                    plt.plot(tVec, x_u_k[:, b, s], label=ylabels[s], color=colors[s])
+            plt.xlabel('sec')
+            plt.legend()
+            plt.grid()
+
+
+
+
+
+def plot(ts, samples, xlabel, ylabel, title=''):
+    ts = ts.cpu()
+    batch_size = samples.shape[1]
+    samples = samples.squeeze().t().cpu()
+    plt.figure()
+    if batch_size > 1:
+        for i, sample in enumerate(samples):
+            plt.plot(ts, sample, marker='x', label=f'sample {i}')
+    else:
+        plt.plot(ts, samples, marker='x', label=f'sample {0}')
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.legend()
+    #plt.show()
+
 
 
