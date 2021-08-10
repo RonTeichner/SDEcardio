@@ -25,7 +25,7 @@ if enableInputWorkload:
         d[int(startIndex):int(stopIndex)+1, :, 0] = dVal
 
 DoylePatient = DoyleSDE(d, d_tVec)
-DoylePatient.calcFixedPoint()
+DoylePatient.create_figure_S4()
 state_size = DoylePatient.state_size
 
 fs = DoylePatient.paramsDict["displayParamsDict"]["fs"]

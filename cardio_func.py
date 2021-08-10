@@ -42,8 +42,8 @@ class DoyleSDE(torch.nn.Module):
         heartParamsDict = {
             # parameters for subject 1 cl,cr = 0.03, 0.05
             # parameters for subject 2 cl,cr = 0.025, 0.045
-            "c_l": 0.025,    #  [L / mmHg]
-            "c_r": 0.045     #  [L / mmHg]
+            "c_l": 0.03,    #  [L / mmHg]
+            "c_r": 0.05     #  [L / mmHg]
         }
 
         circulationParamsDict = {
@@ -111,9 +111,7 @@ class DoyleSDE(torch.nn.Module):
 
         return Pvp, Rs, Fs, Fp, M, delta_O2, Q_l, Q_r
 
-    def calc_gain_K(self, referenceValues):
-        A_L, B_L = self.calc_A_L_B_L(referenceValues)
-
+    def calc_Q_R(self):
         controlParamsDict = self.paramsDict["controlParamsDict"]
         Q, R = torch.zeros(self.state_size, self.state_size), torch.zeros(self.control_size, 1)
 
@@ -121,6 +119,12 @@ class DoyleSDE(torch.nn.Module):
         Q[3, 3] = torch.pow(torch.tensor(controlParamsDict["q_o2"]), 2)
 
         R[0, 0] = torch.pow(torch.tensor(controlParamsDict["q_H"]), 2)
+
+        return Q, R
+
+    def calc_gain_K(self, referenceValues):
+        A_L, B_L = self.calc_A_L_B_L(referenceValues)
+        Q, R = self.calc_Q_R()
 
         P = torch.tensor(solve_continuous_are(a=A_L, b=B_L, q=Q, r=R), dtype=torch.float)
         K = torch.matmul(torch.linalg.inv(R), torch.matmul(torch.transpose(B_L, 1, 0), P))
@@ -212,12 +216,83 @@ class DoyleSDE(torch.nn.Module):
         t=0 # not in use
         return self.calc_dx(t, x.tolist(), paramsDict)
 
-    def calcFixedPoint(self):
+    def calcFixedPoint(self, u, d):
+        # u,d - scalars
+
+        # save original values:
         enableControllerOrigVal = self.enableController
+        controlOrigVal = self.referenceValues["u_L"]
+        inputOrigVal = self.d
+
+        # change to requested fixed-point environment
         self.enableController = False  # Now H has the value of H_L, W has the value of d(t=0)
+        self.d = d*torch.ones_like(self.d)
+        self.referenceValues["u_L"] = u*torch.ones_like(self.referenceValues["u_L"])
+
         fixedPoint = root(self.rootWrapper, self.referenceValues["x_L"].numpy()[:, 0], self.paramsDict)
+
+        # restore original values:
         self.enableController = enableControllerOrigVal
-        return fixedPoint.x
+        self.d = inputOrigVal
+        self.referenceValues["u_L"] = controlOrigVal
+
+        return torch.tensor(fixedPoint.x, dtype=torch.float)[:, None]
+
+    def staticOptimization(self, u_star, d_star, d):
+        x_star = self.calcFixedPoint(u=u_star, d=d_star)
+        Q, R = self.calc_Q_R()
+        # optimization:
+        H_values = torch.linspace(40, 170, 2*(170-40+1), dtype=torch.float)
+
+        minJsWasWritten = False
+        for u in H_values:
+            x = self.calcFixedPoint(u=u, d=d)
+            if x.min() < 0:  # all the physiological values in the state vec are positive in a valid solution
+                continue
+            uDiff, xDiff = (u - u_star)[None, None], x - x_star
+            Js = torch.matmul(torch.transpose(xDiff, 1, 0), torch.matmul(Q, xDiff)) + torch.matmul(torch.transpose(uDiff, 1, 0), torch.matmul(R, uDiff))
+            if not minJsWasWritten:
+                minJs = Js
+                tilde_H = u
+                minJsWasWritten = True
+            elif Js < minJs:
+                minJs = Js
+                tilde_H = u
+
+        tilde_x = self.calcFixedPoint(u=tilde_H, d=d)
+        return tilde_x, tilde_H
+
+    def create_figure_S4(self):
+        origControlParams = self.paramsDict["controlParamsDict"]
+
+        W_values = torch.linspace(0, 250, 2*(250-0+1), dtype=torch.float)
+
+        tilde_x, tilde_H = torch.zeros(W_values.shape[0], self.state_size, 1), torch.zeros(W_values.shape[0], self.control_size, 1)
+        for i, d in enumerate(W_values):
+            if d < 110:
+                d_star = 0  # watt
+                u_star = 48  # heart-rate @ min
+                self.paramsDict["controlParamsDict"]["q_as"], self.paramsDict["controlParamsDict"]["q_o2"], self.paramsDict["controlParamsDict"]["q_H"] = np.sqrt(2), np.sqrt(1e7), np.sqrt(1.5)
+            else:
+                d_star = 100  # watt
+                u_star = 114  # heart-rate @ min
+                self.paramsDict["controlParamsDict"]["q_as"], self.paramsDict["controlParamsDict"]["q_o2"], self.paramsDict["controlParamsDict"]["q_H"] = np.sqrt(4), np.sqrt(1e7), np.sqrt(4)
+            tilde_x[i], tilde_H[i] = self.staticOptimization(u_star=u_star, d_star=d_star, d=d)
+
+        self.paramsDict["controlParamsDict"] = origControlParams
+
+        # plot:
+        W_values, tilde_x, tilde_H = W_values.numpy(), tilde_x.numpy(), tilde_H.numpy()
+        plt.figure()
+        plt.plot(W_values, tilde_x[:, 0, 0], label="Pas", color='blue')
+        delta_O2 = self.paramsDict["circulationParamsDict"]["O_2a"] - tilde_x[:, 3, 0]
+        plt.plot(W_values, 1000*delta_O2, label=r'$\Delta O_2*1000$', color='green')
+        plt.plot(W_values, tilde_H[:, 0, 0], label="H", color='red')
+        plt.grid()
+        plt.legend()
+        plt.xlabel('Workload [watts]')
+        plt.show()
+
 
     # Drift
     def f(self, t, x):
