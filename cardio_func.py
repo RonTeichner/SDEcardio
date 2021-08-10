@@ -7,7 +7,7 @@ from scipy.linalg import solve_continuous_are
 
 class DoyleSDE(torch.nn.Module):
 
-    def __init__(self, d, d_tVec):
+    def __init__(self, d, d_tVec, u_L, d_L, q_as, q_o2, q_H):
         super().__init__()
         self.d = d  # [Watt] d is the workload input of shape # [time-vec, batchSize, 1]; the time-vec should be dense
         self.d_tVec = d_tVec
@@ -15,7 +15,7 @@ class DoyleSDE(torch.nn.Module):
         self.noise_type = "diagonal"
         self.sde_type = "ito"
 
-        self.paramsDict = self.DoyleParams()
+        self.paramsDict = self.DoyleParams(q_as, q_o2, q_H)
         self.state_size = 4
         self.control_size = 1
         self.input_size = self.d.shape[2]
@@ -34,12 +34,12 @@ class DoyleSDE(torch.nn.Module):
 
         # x_L is [state_size, 1], W_L is [input_size, 1], H_L is [control_size, 1]
         self.referenceValues = {"x_L": x_L}
-        self.referenceValues["d_L"], self.referenceValues["u_L"] = torch.tensor([0], dtype=torch.float)[:, None], torch.tensor([48], dtype=torch.float)[:, None]
+        self.referenceValues["d_L"], self.referenceValues["u_L"] = torch.tensor([d_L], dtype=torch.float)[:, None], torch.tensor([u_L], dtype=torch.float)[:, None]
         self.referenceValues["x_L"] = self.calcFixedPoint(u=self.referenceValues["u_L"], d=self.referenceValues["d_L"])
 
         self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
 
-    def DoyleParams(self):
+    def DoyleParams(self, q_as, q_o2, q_H):
         heartParamsDict = {
             # parameters for subject 1 cl,cr = 0.03, 0.05
             # parameters for subject 2 cl,cr = 0.025, 0.045
@@ -64,9 +64,9 @@ class DoyleSDE(torch.nn.Module):
 
         controlParamsDict = {
             # parameters for subject 1,2 @ 0-50 Watt:
-            "q_as": np.sqrt(30),    # 30         # weighting factor, [1 / mmHg]
-            "q_o2": np.sqrt(1e7),  # 100000,     # weighting factor, [L blood / L O2]
-            "q_H": np.sqrt(100)   # 1            # weighting factor, [1 / min]
+            "q_as": np.sqrt(q_as),    # 30         # weighting factor, [1 / mmHg]
+            "q_o2": np.sqrt(q_o2),  # 100000,     # weighting factor, [L blood / L O2]
+            "q_H": np.sqrt(q_H)   # 1            # weighting factor, [1 / min]
         }
 
         displayParamsDict = {

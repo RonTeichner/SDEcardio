@@ -24,14 +24,16 @@ if enableInputWorkload:
         stopIndex = workStopIndexes[i]
         d[int(startIndex):int(stopIndex)+1, :, 0] = dVal
 
-DoylePatient = DoyleSDE(d, d_tVec)
+DoylePatientLow = DoyleSDE(d, d_tVec, u_L=48, d_L=0, q_as=30, q_o2=1e5, q_H=1)
+DoylePatientHigh = DoyleSDE(d+100, d_tVec, u_L=114, d_L=100, q_as=65, q_o2=1e5, q_H=15)
 #DoylePatient.create_figure_S4()
-state_size = DoylePatient.state_size
+state_size = DoylePatientLow.state_size
 
-fs = DoylePatient.paramsDict["displayParamsDict"]["fs"]
+fs = DoylePatientLow.paramsDict["displayParamsDict"]["fs"]
 
 #x_0 = torch.full((batch_size, state_size), 0.1)
-x_0 = DoylePatient.referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0]
+x_0_Low = DoylePatientLow.referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0]
+x_0_High = DoylePatientHigh.referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0]
 tVec = torch.tensor(np.arange(0, np.ceil(simDuration*fs))/fs, dtype=torch.float)  # [sec]
 simDuration = tVec.shape[0]/fs  # [sec]
 
@@ -41,9 +43,11 @@ sys.setrecursionlimit(10000) # this is to enable a long simulation
 
 
 with torch.no_grad():
-    x_k = DoylePatient.runSolveIvp(x_0, simDuration)
+    x_k_Low = DoylePatientLow.runSolveIvp(x_0_Low, simDuration)
+    x_k_High = DoylePatientHigh.runSolveIvp(x_0_High, simDuration)
     #x_k = torchsde.sdeint(DoylePatient, x_0, tVec)
 
-DoylePatient.plot(x_k)
+DoylePatientLow.plot(x_k_Low)
+DoylePatientHigh.plot(x_k_High)
 
 plt.show()
