@@ -25,13 +25,13 @@ if enableInputWorkload:
         d[int(startIndex):int(stopIndex)+1, :, 0] = dVal
 
 DoylePatient = DoyleSDE(d, d_tVec)
-DoylePatient.create_figure_S4()
+#DoylePatient.create_figure_S4()
 state_size = DoylePatient.state_size
 
 fs = DoylePatient.paramsDict["displayParamsDict"]["fs"]
 
 #x_0 = torch.full((batch_size, state_size), 0.1)
-x_0 = torch.tensor([82, 4.250, 11.6, 154/1000], dtype=torch.float)[None, :].repeat(batch_size, 1)
+x_0 = DoylePatient.referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0]
 tVec = torch.tensor(np.arange(0, np.ceil(simDuration*fs))/fs, dtype=torch.float)  # [sec]
 simDuration = tVec.shape[0]/fs  # [sec]
 

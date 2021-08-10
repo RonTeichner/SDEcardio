@@ -29,21 +29,22 @@ class DoyleSDE(torch.nn.Module):
 
         self.noiseStd = torch.tensor([0, 0, 0, 0])  # for state_size=4
 
-        Pas_L, Pvs_L, Pap_L, O2v_L, W_L, H_L = 82, 4.250, 11.6, 154/1000, 100, 41
-        x_L, W_L, H_L = torch.tensor([Pas_L, Pvs_L, Pap_L, O2v_L], dtype=torch.float)[:, None], torch.tensor([W_L], dtype=torch.float)[:, None], torch.tensor([H_L], dtype=torch.float)[:, None]
+        Pas_L, Pvs_L, Pap_L, O2v_L = 82, 4.250, 11.6, 154/1000  # some values that are not used later
+        x_L = torch.tensor([Pas_L, Pvs_L, Pap_L, O2v_L], dtype=torch.float)[:, None]
 
         # x_L is [state_size, 1], W_L is [input_size, 1], H_L is [control_size, 1]
-        self.referenceValues = {"x_L": x_L, "d_L": W_L, "u_L": H_L}
-        self.K = self.calc_gain_K(self.referenceValues)
+        self.referenceValues = {"x_L": x_L}
+        self.referenceValues["d_L"], self.referenceValues["u_L"] = torch.tensor([0], dtype=torch.float)[:, None], torch.tensor([48], dtype=torch.float)[:, None]
+        self.referenceValues["x_L"] = self.calcFixedPoint(u=self.referenceValues["u_L"], d=self.referenceValues["d_L"])
 
-        self.controlBias = torch.matmul(self.K, x_L) + H_L
+        self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
 
     def DoyleParams(self):
         heartParamsDict = {
             # parameters for subject 1 cl,cr = 0.03, 0.05
             # parameters for subject 2 cl,cr = 0.025, 0.045
-            "c_l": 0.03,    #  [L / mmHg]
-            "c_r": 0.05     #  [L / mmHg]
+            "c_l": 0.025,    #  [L / mmHg]
+            "c_r": 0.045     #  [L / mmHg]
         }
 
         circulationParamsDict = {
@@ -63,9 +64,9 @@ class DoyleSDE(torch.nn.Module):
 
         controlParamsDict = {
             # parameters for subject 1,2 @ 0-50 Watt:
-            "q_as": 30,         # weighting factor, [1 / mmHg]
-            "q_o2": 100000,     # weighting factor, [L blood / L O2]
-            "q_H": 1            # weighting factor, [1 / min]
+            "q_as": np.sqrt(30),    # 30         # weighting factor, [1 / mmHg]
+            "q_o2": np.sqrt(1e7),  # 100000,     # weighting factor, [L blood / L O2]
+            "q_H": np.sqrt(100)   # 1            # weighting factor, [1 / min]
         }
 
         displayParamsDict = {
@@ -128,7 +129,9 @@ class DoyleSDE(torch.nn.Module):
 
         P = torch.tensor(solve_continuous_are(a=A_L, b=B_L, q=Q, r=R), dtype=torch.float)
         K = torch.matmul(torch.linalg.inv(R), torch.matmul(torch.transpose(B_L, 1, 0), P))
-        return K
+
+        controlBias = torch.matmul(K, referenceValues["x_L"]) + referenceValues["u_L"]
+        return K, controlBias
 
 
     def calc_A_L_B_L(self, referenceValues):
