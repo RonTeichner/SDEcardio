@@ -3,11 +3,12 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 from scipy.optimize import root
 import numpy as np
+import control
 from scipy.linalg import solve_continuous_are
 
 class DoyleSDE(torch.nn.Module):
 
-    def __init__(self, d, d_tVec, u_L, d_L, q_as, q_o2, q_H):
+    def __init__(self, d, d_tVec, u_L, d_L, q_as, q_o2, q_H, c_l, c_r):
         super().__init__()
         self.d = d  # [Watt] d is the workload input of shape # [time-vec, batchSize, 1]; the time-vec should be dense
         self.d_tVec = d_tVec
@@ -15,7 +16,7 @@ class DoyleSDE(torch.nn.Module):
         self.noise_type = "diagonal"
         self.sde_type = "ito"
 
-        self.paramsDict = self.DoyleParams(q_as, q_o2, q_H)
+        self.paramsDict = self.DoyleParams(q_as, q_o2, q_H, c_l, c_r)
         self.state_size = 4
         self.control_size = 1
         self.input_size = self.d.shape[2]
@@ -37,14 +38,23 @@ class DoyleSDE(torch.nn.Module):
         self.referenceValues["d_L"], self.referenceValues["u_L"] = torch.tensor([d_L], dtype=torch.float)[:, None], torch.tensor([u_L], dtype=torch.float)[:, None]
         self.referenceValues["x_L"] = self.calcFixedPoint(u=self.referenceValues["u_L"], d=self.referenceValues["d_L"])
 
-        self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
+        K_selfCalculation, self.controlBias = self.calc_gain_K(self.referenceValues)
+        # calculating the gain using a control library
+        A_L, B_L = self.calc_A_L_B_L(self.referenceValues)
+        C_L, D_L = torch.zeros_like(A_L), torch.zeros(self.state_size,self.control_size)
+        linearizedSys = control.ss(A_L.numpy(), B_L.numpy(), C_L.numpy(), D_L.numpy())
+        Q, R = self.calc_Q_R()
+        K, S, E = control.lqr(linearizedSys, Q.numpy(), R.numpy())
+        # the calculation made by self.calc_gain_K and by control.lqr lead to the same gain K.
+        # we will take the K from control.lqr for formality...
+        self.K = torch.tensor(K, dtype=torch.float)
 
-    def DoyleParams(self, q_as, q_o2, q_H):
+    def DoyleParams(self, q_as, q_o2, q_H, c_l, c_r):
         heartParamsDict = {
             # parameters for subject 1 cl,cr = 0.03, 0.05
             # parameters for subject 2 cl,cr = 0.025, 0.045
-            "c_l": 0.025,    #  [L / mmHg]
-            "c_r": 0.045     #  [L / mmHg]
+            "c_l": c_l,    #  [L / mmHg]
+            "c_r": c_r     #  [L / mmHg]
         }
 
         circulationParamsDict = {
@@ -153,16 +163,18 @@ class DoyleSDE(torch.nn.Module):
 
         A_L, B_L = torch.zeros(self.state_size, self.state_size), torch.zeros(self.state_size, 1)
 
-        A_L[0, 0] = - 1/(c_as*Rs_L)
-        A_L[0, 1] = - A_L[0, 0]
+        A_L[0, 0] = - 1/(c_as)*(c_as*c_l*H_L/c_vp + 1/Rs_L)
+        A_L[0, 1] = 1/(c_as)*(-c_vs*c_l*H_L/c_vp + 1/Rs_L)
+        A_L[0, 2] = -c_ap*c_l*H_L/(c_as*c_vp)
         A_L[0, 3] = A*Fs_L/(c_as*Rs_L)
 
-        A_L[1, 0] = 1/(c_vs*Rs_L)
+        A_L[1, 0] =  1/(c_vs*Rs_L)
         A_L[1, 1] = - (1/c_vs)*(c_r*H_L + 1/Rs_L)
         A_L[1, 3] = - A*Fs_L/(c_vs*Rs_L)
 
-        A_L[2, 1] = c_r*H_L/c_ap
-        A_L[2, 2] = -1/(c_ap*R_p)
+        A_L[2, 0] = - c_as/(c_ap*c_vp*R_p)
+        A_L[2, 1] = (1/c_ap)*(c_r*H_L - c_vs/(c_vp*R_p))
+        A_L[2, 2] = - 1/(c_ap*R_p)*(1 + c_ap/c_vp)
 
         A_L[3, 0] = delta_O2_L/(Rs_L*V_TO2)
         A_L[3, 1] = -A_L[3, 0]

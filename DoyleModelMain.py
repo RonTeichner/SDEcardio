@@ -24,8 +24,8 @@ if enableInputWorkload:
         stopIndex = workStopIndexes[i]
         d[int(startIndex):int(stopIndex)+1, :, 0] = dVal
 
-DoylePatientLow = DoyleSDE(d, d_tVec, u_L=48, d_L=0, q_as=30, q_o2=1e5, q_H=1)
-DoylePatientHigh = DoyleSDE(d+100, d_tVec, u_L=114, d_L=100, q_as=65, q_o2=1e5, q_H=15)
+DoylePatientLow = DoyleSDE(d,     d_tVec, u_L=55,  d_L=0,   q_as=40, q_o2=1e5, q_H=1,  c_l=0.03, c_r=0.05)
+DoylePatientHigh =DoyleSDE(d+100, d_tVec, u_L=100, d_L=100, q_as=80, q_o2=1e5, q_H=40, c_l=0.03, c_r=0.05)
 #DoylePatient.create_figure_S4()
 state_size = DoylePatientLow.state_size
 
@@ -41,6 +41,8 @@ sys.setrecursionlimit(10000) # this is to enable a long simulation
 # Initial state x0, the SDE is solved over the interval [tVec[0], tVec[-1]].
 # x_k will have shape (tVec.shape[0], batch_size, state_size)
 
+#DoylePatientLow.enableController = False
+#DoylePatientHigh.enableController = False
 
 with torch.no_grad():
     x_k_Low = DoylePatientLow.runSolveIvp(x_0_Low, simDuration)
