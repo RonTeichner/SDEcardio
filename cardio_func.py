@@ -4,12 +4,17 @@ from scipy.integrate import solve_ivp
 from scipy.optimize import root
 import numpy as np
 import control
+import numdifftools as nd
 from scipy.linalg import solve_continuous_are
 
 class DoyleSDE(torch.nn.Module):
 
-    def __init__(self, d, d_tVec, u_L, d_L, q_as, q_o2, q_H, c_l, c_r):
+    def __init__(self, d, d_tVec, u_L, d_L, q_as, q_o2, q_H, c_l, c_r, pinnedList=list()):
         super().__init__()
+
+        self.pinnedList = pinnedList  # this is for matching control parameters to figures at article
+        self.hyperParamSearchCounter = 0
+
         self.d = d  # [Watt] d is the workload input of shape # [time-vec, batchSize, 1]; the time-vec should be dense
         self.d_tVec = d_tVec
 
@@ -21,7 +26,11 @@ class DoyleSDE(torch.nn.Module):
         self.control_size = 1
         self.input_size = self.d.shape[2]
 
+        # debugging:
         self.enableController = True
+        self.enableExternalControlValue = False
+        self.externalControlValue = 0
+        self.scalarFuncNo = 0
 
         self.solveIvpRun = False
         self.solveIvpRunBatchNo = 0
@@ -38,16 +47,7 @@ class DoyleSDE(torch.nn.Module):
         self.referenceValues["d_L"], self.referenceValues["u_L"] = torch.tensor([d_L], dtype=torch.float)[:, None], torch.tensor([u_L], dtype=torch.float)[:, None]
         self.referenceValues["x_L"] = self.calcFixedPoint(u=self.referenceValues["u_L"], d=self.referenceValues["d_L"])
 
-        K_selfCalculation, self.controlBias = self.calc_gain_K(self.referenceValues)
-        # calculating the gain using a control library
-        A_L, B_L = self.calc_A_L_B_L(self.referenceValues)
-        C_L, D_L = torch.zeros_like(A_L), torch.zeros(self.state_size,self.control_size)
-        linearizedSys = control.ss(A_L.numpy(), B_L.numpy(), C_L.numpy(), D_L.numpy())
-        Q, R = self.calc_Q_R()
-        K, S, E = control.lqr(linearizedSys, Q.numpy(), R.numpy())
-        # the calculation made by self.calc_gain_K and by control.lqr lead to the same gain K.
-        # we will take the K from control.lqr for formality...
-        self.K = torch.tensor(K, dtype=torch.float)
+        self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
 
     def DoyleParams(self, q_as, q_o2, q_H, c_l, c_r):
         heartParamsDict = {
@@ -74,13 +74,13 @@ class DoyleSDE(torch.nn.Module):
 
         controlParamsDict = {
             # parameters for subject 1,2 @ 0-50 Watt:
-            "q_as": np.sqrt(q_as),    # 30         # weighting factor, [1 / mmHg]
-            "q_o2": np.sqrt(q_o2),  # 100000,     # weighting factor, [L blood / L O2]
-            "q_H": np.sqrt(q_H)   # 1            # weighting factor, [1 / min]
+            "q_as": q_as,    # 30         # weighting factor, [1 / mmHg]
+            "q_o2": q_o2,  # 100000,     # weighting factor, [L blood / L O2]
+            "q_H": q_H   # 1            # weighting factor, [1 / min]
         }
 
         displayParamsDict = {
-            "fs": 1.0  # [Hz] - figures time resolution
+            "fs": 100  # [Hz] - figures time resolution
         }
 
         paramsDict = {
@@ -134,17 +134,31 @@ class DoyleSDE(torch.nn.Module):
         return Q, R
 
     def calc_gain_K(self, referenceValues):
-        A_L, B_L = self.calc_A_L_B_L(referenceValues)
+        # the two solvers do not agree. different solutions to the riccati equation. Matlab solver agrees with my solver
+        enableLibraryGainCalc = False
+
+        A_L, B_L = self.calc_A_L_B_L(self.referenceValues)
         Q, R = self.calc_Q_R()
 
-        P = torch.tensor(solve_continuous_are(a=A_L, b=B_L, q=Q, r=R), dtype=torch.float)
-        K = torch.matmul(torch.linalg.inv(R), torch.matmul(torch.transpose(B_L, 1, 0), P))
+        if enableLibraryGainCalc:
+            # calculating the gain using a control library
+            C_L, D_L = torch.zeros_like(A_L), torch.zeros(self.state_size, self.control_size)  # aux parameters
+            linearizedSys = control.ss(A_L.numpy(), B_L.numpy(), C_L.numpy(), D_L.numpy())
+
+            K, S, E = control.lqr(linearizedSys, Q.numpy(), R.numpy(), N=np.zeros((self.state_size, self.control_size)))
+            # the calculation made by self.calc_gain_K and by control.lqr lead to the same gain K.
+            # we will take the K from control.lqr for formality...
+            K = torch.tensor(K, dtype=torch.float)
+        else:
+            P = torch.tensor(solve_continuous_are(a=A_L.numpy(), b=B_L.numpy(), q=Q.numpy(), r=R.numpy()), dtype=torch.float)
+            K = torch.matmul(torch.linalg.inv(R), torch.matmul(torch.transpose(B_L, 1, 0), P))
 
         controlBias = torch.matmul(K, referenceValues["x_L"]) + referenceValues["u_L"]
         return K, controlBias
 
 
     def calc_A_L_B_L(self, referenceValues):
+        enableAnalytic = True
         x_L, d_L, u_L = referenceValues["x_L"], referenceValues["d_L"], referenceValues["u_L"]
         # x_L is the reference state vector at low exercise: [state_size, 1], [Pas, Pvs, Pap, O2v]
         # d_L is the reference workload input: [input_size, 1], [W]
@@ -161,48 +175,105 @@ class DoyleSDE(torch.nn.Module):
         Pvp_L, Rs_L, Fs_L, Fp_L, M_L, delta_O2_L, Q_l, Q_r = self.algebricEquations(x_L[None, :, :], u_L[None, :, :], d_L[None, :, :])
         Pvp_L, Rs_L, Fs_L, Fp_L, M_L, delta_O2_L = Pvp_L.squeeze(), Rs_L.squeeze(), Fs_L.squeeze(), Fp_L.squeeze(), M_L.squeeze(), delta_O2_L.squeeze()
 
-        A_L, B_L = torch.zeros(self.state_size, self.state_size), torch.zeros(self.state_size, 1)
+        if enableAnalytic:
+            B_L = torch.zeros(self.state_size, 1)
+            B_L[0, 0] = c_l * Pvp_L / c_as
+            B_L[1, 0] = - c_r * Pvs_L / c_vs
+            B_L[2, 0] = c_r * Pvs_L / c_ap
 
-        A_L[0, 0] = - 1/(c_as)*(c_as*c_l*H_L/c_vp + 1/Rs_L)
-        A_L[0, 1] = 1/(c_as)*(-c_vs*c_l*H_L/c_vp + 1/Rs_L)
-        A_L[0, 2] = -c_ap*c_l*H_L/(c_as*c_vp)
-        A_L[0, 3] = A*Fs_L/(c_as*Rs_L)
+            B_L = self.dotFactor * B_L
 
-        A_L[1, 0] =  1/(c_vs*Rs_L)
-        A_L[1, 1] = - (1/c_vs)*(c_r*H_L + 1/Rs_L)
-        A_L[1, 3] = - A*Fs_L/(c_vs*Rs_L)
+            A_L = torch.zeros(self.state_size, self.state_size)
 
-        A_L[2, 0] = - c_as/(c_ap*c_vp*R_p)
-        A_L[2, 1] = (1/c_ap)*(c_r*H_L - c_vs/(c_vp*R_p))
-        A_L[2, 2] = - 1/(c_ap*R_p)*(1 + c_ap/c_vp)
+            A_L[0, 0] = - 1/(c_as)*(c_as*c_l*H_L/c_vp + 1/Rs_L)
+            A_L[0, 1] = 1/(c_as)*(-c_vs*c_l*H_L/c_vp + 1/Rs_L)
+            A_L[0, 2] = -c_ap*c_l*H_L/(c_as*c_vp)
+            A_L[0, 3] = A*Fs_L/(c_as*Rs_L)
 
-        A_L[3, 0] = delta_O2_L/(Rs_L*V_TO2)
-        A_L[3, 1] = -A_L[3, 0]
-        A_L[3, 3] = -(Fs_L/V_TO2)*(A*delta_O2_L/Rs_L - 1)
+            A_L[1, 0] =  1/(c_vs*Rs_L)
+            A_L[1, 1] = - (1/c_vs)*(c_r*H_L + 1/Rs_L)
+            A_L[1, 3] = - A*Fs_L/(c_vs*Rs_L)
 
-        B_L[0, 0] = c_l*Pvp_L/c_as
-        B_L[1, 0] = -c_r*Pvs_L/c_vs
-        B_L[2, 0] = c_r*Pvs_L/c_ap
+            A_L[2, 0] = - c_as/(c_ap*c_vp*R_p)
+            A_L[2, 1] = (1/c_ap)*(c_r*H_L - c_vs/(c_vp*R_p))
+            A_L[2, 2] = - 1/(c_ap*R_p)*(1 + c_ap/c_vp)
+
+            A_L[3, 0] = delta_O2_L/(Rs_L*V_TO2)
+            A_L[3, 1] = -A_L[3, 0]
+            A_L[3, 3] = -(Fs_L/V_TO2)*(A*delta_O2_L/Rs_L + 1)
+
+            A_L = self.dotFactor*A_L
+        else:
+            enableControllerOrigVal = self.enableController
+            self.enableController = False
+            fun = lambda x: self.f(0, torch.tensor(x)[None, :, :][:, :, 0])[0, :][:, None].numpy()
+            A_L = torch.tensor(nd.Jacobian(fun)(x_L.numpy()), dtype=torch.float)
+            self.enableController = enableControllerOrigVal
+
+            B_L = torch.zeros(self.state_size, 1, dtype=torch.float)
+            for s in range(self.state_size):
+                self.scalarFuncNo = s
+                f = nd.Derivative(self.scalar_f_externalControl, full_output=True)
+                val, info = f(self.referenceValues["u_L"][0].numpy())
+                B_L[s, 0] = torch.tensor(val, dtype=torch.float)
 
         return A_L, B_L
 
-    def calcControl(self, x):
+    def calcControl(self, x, t):
         # x is the state vector: [batch_size, state_size, 1], [Pas, Pvs, Pap, O2v]
         batch_size = x.shape[0]
-        x_L, u_L = self.referenceValues["x_L"], self.referenceValues["u_L"]
-        # x_L is the reference state vector at low exercise: [state_size, 1], [Pas, Pvs, Pap, O2v]
-        # d_L is the reference workload input: [input_size, 1], [W]
-        # u_L is the reference heart rate at low exercise [control_size, 1], [H]
 
         if self.enableController:
             K = self.K
-            x_L, H_L = x_L[None, :, :].repeat(batch_size, 1, 1), u_L[None, :, :].repeat(batch_size, 1, 1)
-
             u = - torch.matmul(K, x) + self.controlBias[None, :, :].repeat(batch_size, 1, 1)
             # u is the control [batch_size, control_size, 1]
-        else:
+        elif self.enableExternalControlValue:
+            u = torch.tensor(self.externalControlValue, dtype=torch.float)[None, None].repeat(batch_size, 1, 1)
+        else: # using reference value
+            u_L = self.referenceValues["u_L"]
+            # u_L is the reference heart rate at low exercise [control_size, 1], [H]
             u = u_L[None, :, :].repeat(batch_size, 1, 1)
+        '''
+        # manual control
+        # print(f'input time is {t}')
+        tStart = 22.5
+        a = 5
+        b = 0.8
+        if t > tStart:
+            u = self.referenceValues["u_L"] + a * np.log(b*(1 + t - tStart))
+        else:
+            u = self.referenceValues["u_L"]
+        u = u[None, :, :].repeat(batch_size, 1, 1)
+        print(f't: {t}, HR: {u}')
+        '''
         return u
+
+    def controlParamsOptimizeSciPy(self, controlParams):
+        return self.controlParamsOptimize(controlParams.tolist())
+
+    def controlParamsOptimize(self, controlParamList):
+        q_as, q_o2, c_l, c_r = controlParamList
+        q_H = 1
+
+        self.paramsDict["controlParamsDict"]["q_as"] = q_as
+        self.paramsDict["controlParamsDict"]["q_o2"] = q_o2
+        self.paramsDict["controlParamsDict"]["q_H"] = q_H
+        self.paramsDict["heartParamsDict"]["c_l"] = c_l
+        self.paramsDict["heartParamsDict"]["c_r"] = c_r
+
+        self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
+
+        pinned_Times, pinned_HR, pinned_Pas, pinned_O2, simDuration = self.pinnedList
+
+        with torch.no_grad():
+            x_k = self.runSolveIvp(self.referenceValues["x_L"][None, :, :][:, :, 0], simDuration)
+            u_k = self.reCalcControl(x_k)
+            tVec = self.getTvec(x_k)
+        score = self.calcScore(x_k, u_k, tVec, pinned_Times, pinned_HR, pinned_Pas, pinned_O2)
+
+        print(f'q_as = {q_as}, q_o2 = {q_o2}, q_H = {q_H}, c_l = {c_l}, c_r = {c_r}, score = {score}')
+
+        return score
 
     def runSolveIvp(self, x_0, simDuration):
         self.solveIvpRun = True
@@ -308,27 +379,32 @@ class DoyleSDE(torch.nn.Module):
         plt.xlabel('Workload [watts]')
         plt.show()
 
+    def scalar_f_externalControl(self, externalControlValue):
+        origEnableControlVal, origEnableExternalControlVal = self.enableController, self.enableExternalControlValue
+        self.enableController, self.enableExternalControlValue = False, True
+        self.externalControlValue = externalControlValue
+
+        xDot = self.f(0, self.referenceValues["x_L"][None, :, :][:, :, 0])
+
+        self.enableController, self.enableExternalControlValue = origEnableControlVal, origEnableExternalControlVal
+
+        return xDot[0, self.scalarFuncNo:self.scalarFuncNo+1].numpy()
 
     # Drift
     def f(self, t, x):
         # x is the state vector: [batch_size, state_size], [Pas, Pvs, Pap, O2v]
         # d is the workload input: [batch_size, 1], [W]
 
-        batch_size = x.shape[0]
-
         dIndex = torch.argmin(torch.abs(self.d_tVec - t))
         W = self.d[dIndex]
-
-        Pas, Pvs, Pap, O2v = x[:, 0:1, None], x[:, 1:2, None], x[:, 2:3, None], x[:, 3:4, None]
 
         circulationParamsDict, heartParamsDict = self.paramsDict["circulationParamsDict"], self.paramsDict["heartParamsDict"]
         c_as, c_vs, c_ap, c_vp = circulationParamsDict["c_as"], circulationParamsDict["c_vs"], circulationParamsDict["c_ap"], circulationParamsDict["c_vp"]
         V_tot, A, R_s0, rho, M_0, R_p, O_2a, V_TO2 = circulationParamsDict["V_tot"], circulationParamsDict["A"], circulationParamsDict["R_s0"], circulationParamsDict["rho"], circulationParamsDict["M_0"], circulationParamsDict["R_p"], circulationParamsDict["O_2a"], circulationParamsDict["V_TO2"]
-        c_l, c_r = heartParamsDict["c_l"], heartParamsDict["c_r"]
 
-        H = self.calcControl(x[:, :, None])
+        H = self.calcControl(x[:, :, None], t)
+
         Pvp, Rs, Fs, Fp, M, delta_O2, Q_l, Q_r = self.algebricEquations(x[:, :, None], u=H, d=W[:, :, None])
-
 
         dot_Pas = self.dotFactor*(1/c_as)*(Q_l - Fs)
         dot_Pvs = self.dotFactor*(1/c_vs)*(Fs - Q_r)
@@ -343,23 +419,56 @@ class DoyleSDE(torch.nn.Module):
         batch_size = x.shape[0]
         return self.noiseStd[None, :].repeat(batch_size, 1)
 
-    def plot(self, x_k):
+    def reCalcControl(self, x_k):
         # x_k shape (nSamples, batch_size, state_size)
         nSamples, batch_size = x_k.shape[0], x_k.shape[1]
+        tVec = self.getTvec(x_k)
         # recalc the control:
         u_k = torch.zeros(nSamples, batch_size, self.control_size, dtype=torch.float)
         for k in range(nSamples):
-            u_k[k] = self.calcControl(x_k[k][:, :, None])[:, :self.control_size, 0]
+            u_k[k] = self.calcControl(x_k[k][:, :, None], tVec[k])[:, :self.control_size, 0]
+        return u_k
+
+    def getTvec(self, x_k):
+        nSamples, batch_size = x_k.shape[0], x_k.shape[1]
+        fs = self.paramsDict["displayParamsDict"]["fs"]
+        tVec = np.arange(0, nSamples) / fs
+        return torch.tensor(tVec, dtype=torch.float)
+
+    def calcScore(self, x_k, u_k, tVec, pinned_Times, pinned_HR, pinned_Pas, pinned_O2):
+        tVecQueryIndexes = torch.zeros_like(pinned_Times)
+        for i, time in enumerate(pinned_Times):
+            tVecQueryIndexes[i] = torch.argmin(torch.abs(tVec - time))
+
+        Pas_at_queryTimes = x_k[tVecQueryIndexes.long()][:, 0, 0]
+        O2_at_queryTimes = 1000 * x_k[tVecQueryIndexes.long()][:, 0, 3]
+        HR_at_queryTimes = u_k[tVecQueryIndexes.long()][:, 0, 0]
+
+        Pas_score = torch.norm(Pas_at_queryTimes - pinned_Pas)
+        O2_score = torch.norm(O2_at_queryTimes - pinned_O2)
+        HR_score = torch.norm(HR_at_queryTimes - pinned_HR)
+        score = Pas_score + O2_score + HR_score
+        #score = HR_score
+
+        return score
+
+    def plot(self, x_k):
+        # x_k shape (nSamples, batch_size, state_size)
+        nSamples, batch_size = x_k.shape[0], x_k.shape[1]
+        tVec = self.getTvec(x_k)
+        # recalc the control:
+        u_k = self.reCalcControl(x_k)
 
         x_k[:, :, 3] = 1000*x_k[:, :, 3] # to converts the units from [L O2 / L blood] to [mL O2 / L blood]
 
         x_u_k = torch.cat((x_k, u_k), dim=2)
         x_u_k = x_u_k.cpu().numpy()
 
-        tVec = np.arange(0, nSamples)/self.paramsDict["displayParamsDict"]["fs"]
+
 
         ylabels = ["Pas", "Pvs", "Pap", "O2v", "HR", "W"]
         colors = ['magenta', 'yellow', 'yellow', 'green', 'black', 'blue']
+        '''
         plt.figure(figsize=(16, 12))
         for s in range(self.state_size + self.control_size + self.input_size):
             plt.subplot(2, 3, s+1)
@@ -373,7 +482,7 @@ class DoyleSDE(torch.nn.Module):
             plt.ylabel(ylabels[s])
             plt.legend()
             plt.grid()
-
+        '''
         sList = [0, 3, 4, 5]
         for b in range(batch_size):
             plt.figure()
@@ -385,6 +494,7 @@ class DoyleSDE(torch.nn.Module):
             plt.xlabel('sec')
             plt.legend()
             plt.grid()
+
 
 
 
