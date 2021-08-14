@@ -9,7 +9,7 @@ import black_box as bb
 from cardio_func import *
 
 
-simDuration = 100  # sec
+simDuration = 400  # sec
 batch_size = 1
 enablePinnedSearch = True
 enableInputWorkload = True
@@ -53,8 +53,8 @@ pinned_O2 = torch.tensor([150.61, 136.7136, 126.197, 120.5633, 117.5586], dtype=
 
 #  subject 3:
 #DoylePatientLow = DoyleSDE(d,    d_tVec, u_L=45.8, d_L=0,  q_as=850, q_o2=2.3076e+06, q_H=1,  c_l=0.02, c_r=0.04)
-DoylePatientLow = DoyleSDE(d,    d_tVec, u_L=45.8, d_L=0,  q_as=0, q_o2=1600, q_H=1,  c_l=0.02, c_r=0.04)
-DoylePatientHigh =DoyleSDE(d+55, d_tVec, u_L=90,   d_L=55, q_as=65, q_o2=1e7, q_H=15, c_l=0.02, c_r=0.04)
+DoylePatientLow = DoyleSDE(d,    d_tVec, u_L=45.8, d_L=0,  q_as=40, q_o2=1e5, q_H=5,  c_l=0.02, c_r=0.04)
+DoylePatientHigh =DoyleSDE(d+55, d_tVec, u_L=90,   d_L=55, q_as=65, q_o2=1e5, q_H=15, c_l=0.02, c_r=0.04)
 
 #DoylePatient.create_figure_S4()
 state_size = DoylePatientLow.state_size
@@ -78,11 +78,11 @@ with torch.no_grad():
     x_k_Low = DoylePatientLow.runSolveIvp(x_0_Low, simDuration)
     u_k_Low = DoylePatientLow.reCalcControl(x_k_Low)
     tVec_Low = DoylePatientLow.getTvec(x_k_Low)
-    #x_k_High = DoylePatientHigh.runSolveIvp(x_0_High, simDuration)
+    x_k_High = DoylePatientHigh.runSolveIvp(x_0_High, simDuration)
     #x_k = torchsde.sdeint(DoylePatient, x_0, tVec)
 
 DoylePatientLow.plot(x_k_Low)
-#DoylePatientHigh.plot(x_k_High)
+DoylePatientHigh.plot(x_k_High)
 
 plt.show()
 
