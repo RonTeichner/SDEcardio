@@ -9,14 +9,14 @@ from scipy.linalg import solve_continuous_are
 
 class DoyleSDE(torch.nn.Module):
 
-    def __init__(self, d, d_tVec, u_L, d_L, q_as, q_o2, q_H, c_l, c_r, pinnedList=list()):
+    def __init__(self, u_L, d_L, q_as, q_o2, q_H, c_l, c_r, pinnedList=list()):
         super().__init__()
 
         self.pinnedList = pinnedList  # this is for matching control parameters to figures at article
         self.hyperParamSearchCounter = 0
 
-        self.d = d  # [Watt] d is the workload input of shape # [time-vec, batchSize, 1]; the time-vec should be dense
-        self.d_tVec = d_tVec
+        self.d = torch.zeros(1, 1, 1, dtype=torch.float)  # [Watt] d is the workload input of shape # [time-vec, batchSize, 1]; the time-vec should be dense
+        self.d_tVec = 0
 
         self.noise_type = "diagonal"
         self.sde_type = "ito"
@@ -275,7 +275,8 @@ class DoyleSDE(torch.nn.Module):
 
         return score
 
-    def runSolveIvp(self, x_0, simDuration):
+    def runSolveIvp(self, x_0, d, d_tVec, simDuration):
+        self.d, self.d_tVec = d, d_tVec
         self.solveIvpRun = True
         batchSize = x_0.shape[0]
         solList = list()
@@ -496,7 +497,35 @@ class DoyleSDE(torch.nn.Module):
             plt.grid()
 
 
+def generate_workload_profile(batch_size, simDuration, enableInputWorkload):
+    dfs = 100  # [hz]
+    dVal = 53.3  # [watt]
+    d_tVec = torch.tensor(np.arange(0, np.ceil(simDuration * dfs)) / dfs)
+    d = torch.zeros(d_tVec.shape[0], batch_size, 1, dtype=torch.float)
+    if enableInputWorkload:
+        workStartTimes = np.array([33.17, 100, 225])  # [sec]
+        workStopTimes = np.array([74.4, 160, 310])  # [sec]
+        workStartIndexes = np.round(dfs * workStartTimes)
+        workStopIndexes = np.round(dfs * workStopTimes)
+        for i, startIndex in enumerate(workStartIndexes):
+            stopIndex = workStopIndexes[i]
+            d[int(startIndex):int(stopIndex) + 1, :, 0] = dVal
 
+        # Pinned values from figure S14:
+        workPinnedTimes = np.array([28.43, 28.9, 29.383, 29.857, 33.17])
+        workPinnedValues = np.array([0, 9.765, 28.544, 40.1877, 53.33])
+        workStartIndexes = np.round(dfs * workPinnedTimes)
+        workStopTimes = workPinnedTimes[1:]
+        workStopIndexes = np.round(dfs * workStopTimes)
+        for i, startIndex in enumerate(workStartIndexes):
+            if i == 4:
+                stopIndex = workStopIndexes[i - 1]
+                d[int(startIndex):int(stopIndex) + 1, :, 0] = torch.linspace(workPinnedValues[i], workPinnedValues[i], int(stopIndex) - int(startIndex) + 1)[:, None]
+            else:
+                stopIndex = workStopIndexes[i]
+                d[int(startIndex):int(stopIndex) + 1, :, 0] = torch.linspace(workPinnedValues[i], workPinnedValues[i + 1], int(stopIndex) - int(startIndex) + 1)[:, None]
+
+    return d, d_tVec
 
 
 
