@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 from scipy.optimize import root
 import numpy as np
+import sys
 import control
+import torchsde
 import numdifftools as nd
 from scipy.linalg import solve_continuous_are
 
@@ -518,6 +520,9 @@ def generate_workload_profile(batch_size, simDuration, enableInputWorkload):
         workStopTimes = workPinnedTimes[1:]
         workStopIndexes = np.round(dfs * workStopTimes)
         for i, startIndex in enumerate(workStartIndexes):
+            currentStartTime = workPinnedTimes[i]
+            if currentStartTime > simDuration:
+                break
             if i == 4:
                 stopIndex = workStopIndexes[i - 1]
                 d[int(startIndex):int(stopIndex) + 1, :, 0] = torch.linspace(workPinnedValues[i], workPinnedValues[i], int(stopIndex) - int(startIndex) + 1)[:, None]
@@ -527,7 +532,15 @@ def generate_workload_profile(batch_size, simDuration, enableInputWorkload):
 
     return d, d_tVec
 
-
+def runSdeint(DoylePatient, x_0, d, d_tVec, simDuration):
+    sys.setrecursionlimit(10000)  # this is to enable a long simulation in torchsde
+    #DoylePatient.set_d(d, d_tVec)
+    DoylePatient.d, DoylePatient.d_tVec = d, d_tVec
+    DoylePatient.solveIvpRun = False
+    fs = DoylePatient.paramsDict["displayParamsDict"]["fs"]
+    nSamples = np.ceil(simDuration*fs)
+    tVec = torch.tensor(np.arange(0, nSamples) / fs, dtype=torch.float)
+    return torchsde.sdeint(DoylePatient, x_0, tVec, adaptive=True)
 
 def plot(ts, samples, xlabel, ylabel, title=''):
     ts = ts.cpu()

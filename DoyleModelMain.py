@@ -26,18 +26,24 @@ workRefHigh = DoylePatientHigh.referenceValues["d_L"][None, :, :].repeat(batch_s
 # creating the workload profile:
 d, d_tVec = generate_workload_profile(batch_size, simDuration, enableInputWorkload)
 
-# sys.setrecursionlimit(10000) # this is to enable a long simulation in torchsde
 # Initial state x0, the SDE is solved over the interval [tVec[0], tVec[-1]].
 # x_k will have shape (tVec.shape[0], batch_size, state_size)
 
 # running the simulation and obtaining the trajectories:
 with torch.no_grad():
-    x_k_Low = DoylePatientLow.runSolveIvp(x_0_Low, d+workRefLow, d_tVec, simDuration)
-    x_k_High = DoylePatientHigh.runSolveIvp(x_0_High, d+workRefHigh, d_tVec, simDuration)
-    #x_k = torchsde.sdeint(DoylePatient, x_0, tVec)
+    x_k_Low = DoylePatientLow.runSolveIvp(x_0_Low, d + workRefLow, d_tVec, simDuration)
+    #x_k_High = DoylePatientHigh.runSolveIvp(x_0_High, d + workRefHigh, d_tVec, simDuration)
+
+    tVec = DoylePatientLow.getTvec(x_k_Low)
+
+    x_k_Low_sde = runSdeint(DoylePatientLow, x_0_Low, d + workRefLow, d_tVec, simDuration)
+    #sys.setrecursionlimit(10000)  # this is to enable a long simulation in torchsde
+    #x_k_Low_sde = torchsde.sdeint(DoylePatientLow, x_0_Low, tVec)
 
 # plotting the trajectories:
-DoylePatientLow.plot(x_k_Low)
-DoylePatientHigh.plot(x_k_High)
+#DoylePatientLow.plot(x_k_Low)
+#DoylePatientHigh.plot(x_k_High)
+
+DoylePatientLow.plot(x_k_Low_sde)
 plt.show()
 
