@@ -39,8 +39,6 @@ class DoyleSDE(torch.nn.Module):
 
         self.dotFactor = 1/60  # all units are in minutes
 
-        self.noiseStd = torch.tensor([0, 0, 0, 0])  # for state_size=4
-
         Pas_L, Pvs_L, Pap_L, O2v_L = 82, 4.250, 11.6, 154/1000  # some values that are not used later
         x_L = torch.tensor([Pas_L, Pvs_L, Pap_L, O2v_L], dtype=torch.float)[:, None]
 
@@ -50,6 +48,9 @@ class DoyleSDE(torch.nn.Module):
         self.referenceValues["x_L"] = self.calcFixedPoint(u=self.referenceValues["u_L"], d=self.referenceValues["d_L"])
 
         self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
+
+        self.noiseStdFactor = 2.5e-3
+        self.noiseStd = self.noiseStdFactor * self.referenceValues["x_L"][:, 0]
 
     def DoyleParams(self, q_as, q_o2, q_H, c_l, c_r):
         heartParamsDict = {
