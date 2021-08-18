@@ -420,8 +420,9 @@ class DoyleSDE(torch.nn.Module):
 
     # Diffusion
     def g(self, t, x):
+        # The process noise at state i is distributed such that \omega_{t+u} - \omega{t} ~ N(0,(self.noiseStd[i])^2*u)
         batch_size = x.shape[0]
-        return self.noiseStd[None, :].repeat(batch_size, 1)
+        return self.noiseStd[None, :].repeat(batch_size, 1)  # [batch_size, state_size]
 
     def reCalcControl(self, x_k):
         # x_k shape (nSamples, batch_size, state_size)
