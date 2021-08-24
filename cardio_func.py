@@ -11,7 +11,7 @@ from scipy.linalg import solve_continuous_are
 
 class DoyleSDE(torch.nn.Module):
 
-    def __init__(self, u_L, d_L, q_as, q_o2, q_H, c_l, c_r, pinnedList=list()):
+    def __init__(self, u_L, d_L, tilde_q_as, tilde_q_o2, tilde_q_H, c_l, c_r, pinnedList=list()):
         super().__init__()
 
         self.pinnedList = pinnedList  # this is for matching control parameters to figures at article
@@ -23,7 +23,6 @@ class DoyleSDE(torch.nn.Module):
         self.noise_type = "diagonal"
         self.sde_type = "ito"
 
-        self.paramsDict = self.DoyleParams(q_as, q_o2, q_H, c_l, c_r)
         self.state_size = 4
         self.control_size = 1
         self.input_size = self.d.shape[2]
@@ -45,12 +44,21 @@ class DoyleSDE(torch.nn.Module):
         # x_L is [state_size, 1], W_L is [input_size, 1], H_L is [control_size, 1]
         self.referenceValues = {"x_L": x_L}
         self.referenceValues["d_L"], self.referenceValues["u_L"] = torch.tensor([d_L], dtype=torch.float)[:, None], torch.tensor([u_L], dtype=torch.float)[:, None]
+
+        q_as, q_o2, q_H = self.controller_unitLessParams_to_unitParams(tilde_q_as, tilde_q_o2, tilde_q_H, self.referenceValues["x_L"], self.referenceValues["u_L"]) # will be updated when set point is calculated
+        self.paramsDict = self.DoyleParams(q_as, q_o2, q_H, c_l, c_r)
         self.referenceValues["x_L"] = self.calcFixedPoint(u=self.referenceValues["u_L"], d=self.referenceValues["d_L"])
+
+        q_as, q_o2, q_H = self.controller_unitLessParams_to_unitParams(tilde_q_as, tilde_q_o2, tilde_q_H, self.referenceValues["x_L"], self.referenceValues["u_L"]) # will be updated when set point is calculated
+        self.paramsDict = self.DoyleParams(q_as, q_o2, q_H, c_l, c_r)
 
         self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
 
         self.noiseStdFactor = 2.5e-3
         self.noiseStd = self.noiseStdFactor * self.referenceValues["x_L"][:, 0]
+
+    def controller_unitLessParams_to_unitParams(self, tilde_q_as, tilde_q_o2, tilde_q_H, x_L, u_L):
+        return tilde_q_as*x_L[0], tilde_q_o2*x_L[3], tilde_q_H*u_L
 
     def DoyleParams(self, q_as, q_o2, q_H, c_l, c_r):
         heartParamsDict = {
