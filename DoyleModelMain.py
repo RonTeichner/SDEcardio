@@ -9,22 +9,24 @@ import black_box as bb
 from cardio_func import *
 
 # simulation parameters:
-simDuration = 400  # sec
+simDuration = 60*10  # sec
 batch_size = 1
 enableInputWorkload = True
 
 # creating two profiles of the same patient, one for each workload:
-DoylePatientLow = DoyleSDE(u_L=45.8, d_L=0,  tilde_q_as=40/74.4346, tilde_q_o2=1e5/0.1526, tilde_q_H=5/45.8,  c_l=0.02, c_r=0.04)
-DoylePatientHigh =DoyleSDE(u_L=90,   d_L=55, tilde_q_as=65/116.9215, tilde_q_o2=1e5/0.1218, tilde_q_H=15/90, c_l=0.02, c_r=0.04)
+DoylePatient = createRandomPatient()
 
 # creating the starting point to be a fixed point of the system in order to match the figures in the article:
-x_0_Low = DoylePatientLow.referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0]
-x_0_High = DoylePatientHigh.referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0]
-workRefLow = DoylePatientLow.referenceValues["d_L"][None, :, :].repeat(batch_size, 1, 1)
-workRefHigh = DoylePatientHigh.referenceValues["d_L"][None, :, :].repeat(batch_size, 1, 1)
+x_0 = list()
+x_0.append(DoylePatient[0].referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0])
+x_0.append(DoylePatient[1].referenceValues["x_L"][None, :, :].repeat(batch_size, 1, 1)[:, :, 0])
+
 
 # creating the workload profile:
-d, d_tVec = generate_workload_profile(batch_size, simDuration, enableInputWorkload)
+workRef = list()
+workRef.append(DoylePatient[0].referenceValues["d_L"][None, :, :].repeat(batch_size, 1, 1))
+workRef.append(DoylePatient[1].referenceValues["d_L"][None, :, :].repeat(batch_size, 1, 1))
+d, d_tVec = generate_workload_profile(batch_size, simDuration, workRef, enableInputWorkload)
 
 # Initial state x0, the SDE is solved over the interval [tVec[0], tVec[-1]].
 # x_k will have shape (tVec.shape[0], batch_size, state_size)
@@ -34,14 +36,15 @@ d, d_tVec = generate_workload_profile(batch_size, simDuration, enableInputWorklo
 with torch.no_grad():
     device = "cpu"  # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # failed to transform to GPU, not working on it anymore...
-    DoylePatientLow.to(device)
-    DoylePatientHigh.to(device)
-    x_k_Low_sde = runSdeint(DoylePatientLow, x_0_Low.to(device), (d + workRefLow).to(device), d_tVec.to(device), simDuration)
-    x_k_High_sde = runSdeint(DoylePatientHigh, x_0_High.to(device), (d + workRefHigh).to(device), d_tVec.to(device), simDuration)
+    DoylePatient[0].to(device)
+    DoylePatient[1].to(device)
+
+    runSdeint(DoylePatient[0], x_0[0].to(device), d[0].to(device), d_tVec.to(device), simDuration)
+    runSdeint(DoylePatient[1], x_0[1].to(device), d[1].to(device), d_tVec.to(device), simDuration)
 
 
 # plotting the trajectories:
-DoylePatientLow.plot(x_k_Low_sde)
-DoylePatientHigh.plot(x_k_High_sde)
+DoylePatient[0].plot(DoylePatient[0].x_k_sde)
+DoylePatient[1].plot(DoylePatient[1].x_k_sde)
 plt.show()
 

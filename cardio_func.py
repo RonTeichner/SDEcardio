@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 from scipy.optimize import root
+from scipy.signal import firwin, lfilter
 import numpy as np
 import sys
 import control
@@ -11,8 +12,10 @@ from scipy.linalg import solve_continuous_are
 
 class DoyleSDE(torch.nn.Module):
 
-    def __init__(self, u_L, d_L, tilde_q_as, tilde_q_o2, tilde_q_H, c_l, c_r, pinnedList=list()):
+    def __init__(self, u_L, d_L, q_as, q_o2, q_H, c_l, c_r, pinnedList=list()):
         super().__init__()
+
+        self.x_k_sde = torch.zeros(1, 1, 1, dtype=torch.float)
 
         self.pinnedList = pinnedList  # this is for matching control parameters to figures at article
         self.hyperParamSearchCounter = 0
@@ -45,12 +48,8 @@ class DoyleSDE(torch.nn.Module):
         self.referenceValues = {"x_L": x_L}
         self.referenceValues["d_L"], self.referenceValues["u_L"] = torch.tensor([d_L], dtype=torch.float)[:, None], torch.tensor([u_L], dtype=torch.float)[:, None]
 
-        q_as, q_o2, q_H = self.controller_unitLessParams_to_unitParams(tilde_q_as, tilde_q_o2, tilde_q_H, self.referenceValues["x_L"], self.referenceValues["u_L"]) # will be updated when set point is calculated
         self.paramsDict = self.DoyleParams(q_as, q_o2, q_H, c_l, c_r)
         self.referenceValues["x_L"] = self.calcFixedPoint(u=self.referenceValues["u_L"], d=self.referenceValues["d_L"])
-
-        q_as, q_o2, q_H = self.controller_unitLessParams_to_unitParams(tilde_q_as, tilde_q_o2, tilde_q_H, self.referenceValues["x_L"], self.referenceValues["u_L"]) # will be updated when set point is calculated
-        self.paramsDict = self.DoyleParams(q_as, q_o2, q_H, c_l, c_r)
 
         self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
 
@@ -509,37 +508,27 @@ class DoyleSDE(torch.nn.Module):
             plt.grid()
 
 
-def generate_workload_profile(batch_size, simDuration, enableInputWorkload):
+def generate_workload_profile(batch_size, simDuration, workRef, enableInputWorkload):
     dfs = 100  # [hz]
-    dVal = 53.3  # [watt]
+    cutoffFreq = 1/200  # hz
+    workStd = 300
+    firtaps = firwin(numtaps=1000, cutoff=cutoffFreq, fs=dfs)
     d_tVec = torch.tensor(np.arange(0, np.ceil(simDuration * dfs)) / dfs)
-    d = torch.zeros(d_tVec.shape[0], batch_size, 1, dtype=torch.float)
+    d = list()  #np.zeros((d_tVec.shape[0], batch_size, 1))
     if enableInputWorkload:
-        workStartTimes = np.array([33.17, 100, 225])  # [sec]
-        workStopTimes = np.array([74.4, 160, 310])  # [sec]
-        workStartIndexes = np.round(dfs * workStartTimes)
-        workStopIndexes = np.round(dfs * workStopTimes)
-        for i, startIndex in enumerate(workStartIndexes):
-            stopIndex = workStopIndexes[i]
-            d[int(startIndex):int(stopIndex) + 1, :, 0] = dVal
-
-        # Pinned values from figure S14:
-        workPinnedTimes = np.array([28.43, 28.9, 29.383, 29.857, 33.17])
-        workPinnedValues = np.array([0, 9.765, 28.544, 40.1877, 53.33])
-        workStartIndexes = np.round(dfs * workPinnedTimes)
-        workStopTimes = workPinnedTimes[1:]
-        workStopIndexes = np.round(dfs * workStopTimes)
-        for i, startIndex in enumerate(workStartIndexes):
-            currentStartTime = workPinnedTimes[i]
-            if currentStartTime > simDuration:
-                break
-            if i == 4:
-                stopIndex = workStopIndexes[i - 1]
-                d[int(startIndex):int(stopIndex) + 1, :, 0] = torch.linspace(workPinnedValues[i], workPinnedValues[i], int(stopIndex) - int(startIndex) + 1)[:, None]
-            else:
-                stopIndex = workStopIndexes[i]
-                d[int(startIndex):int(stopIndex) + 1, :, 0] = torch.linspace(workPinnedValues[i], workPinnedValues[i + 1], int(stopIndex) - int(startIndex) + 1)[:, None]
-
+        for workVal in workRef:
+            n = workVal[0,0,0].numpy() + workStd*np.random.randn(d_tVec.shape[0], batch_size, 1)
+            d.append(torch.tensor(lfilter(firtaps, 1, n, axis=0), dtype=torch.float))
+    '''
+    plt.figure()
+    plt.plot(d_tVec.numpy(), d[0][:,0,0].numpy(), label='low')
+    plt.plot(d_tVec.numpy(), d[1][:, 0, 0].numpy(), label='high')
+    plt.xlabel('sec')
+    plt.ylabel('watt')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    '''
     return d, d_tVec
 
 def runSdeint(DoylePatient, x_0, d, d_tVec, simDuration):
@@ -550,7 +539,8 @@ def runSdeint(DoylePatient, x_0, d, d_tVec, simDuration):
     fs = DoylePatient.paramsDict["displayParamsDict"]["fs"]
     nSamples = np.ceil(simDuration*fs)
     tVec = torch.tensor(np.arange(0, nSamples) / fs, dtype=torch.float)
-    return torchsde.sdeint(DoylePatient, x_0, tVec, adaptive=True)
+    DoylePatient.x_k_sde = torchsde.sdeint(DoylePatient, x_0, tVec, adaptive=True)
+    return DoylePatient.x_k_sde
 
 def plot(ts, samples, xlabel, ylabel, title=''):
     ts = ts.cpu()
@@ -567,6 +557,22 @@ def plot(ts, samples, xlabel, ylabel, title=''):
     plt.ylabel(ylabel)
     plt.legend()
     #plt.show()
+
+def createRandomPatient():
+    DoylePatient = list()
+    # rand patient parameters:
+    min_cl, diff_cl, diff_cr_cl = 0.02, 0.012, 0.02
+    cl = min_cl + diff_cl * np.random.rand()
+    cr = cl + diff_cr_cl
+    HrLow, HrHigh = 40 + 20 * np.random.rand(), 90 + 30 * np.random.rand()
+    WrefLow, WrefHigh = 40 + 20 * np.random.rand(), 90 + 20 * np.random.rand()
+    qasLow, qasHigh = 30 + 15 * np.random.rand(), 65 + 20 * np.random.rand()
+    qO2Low, qO2High = 1e5 + 0 * np.random.rand(), 1e5 + 0 * np.random.rand()
+    qHLow, qHHigh = 1 + 5 * np.random.rand(), 15 + 35 * np.random.rand()
+    DoylePatient.append(DoyleSDE(u_L=HrLow, d_L=WrefLow, q_as=qasLow, q_o2=qO2Low, q_H=qHLow, c_l=cl, c_r=cr))
+    DoylePatient.append(DoyleSDE(u_L=HrHigh, d_L=WrefHigh, q_as=qasHigh, q_o2=qO2High, q_H=qHHigh, c_l=cl, c_r=cr))
+
+    return DoylePatient
 
 
 
