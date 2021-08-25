@@ -15,6 +15,7 @@ enableInputWorkload = True
 
 # create a dataset of patients, each patient has a low and high workload profile and a trajectory at each profile:
 fileName = 'DoylePatientsDataset.pt'
+enableSaveFile = False
 nPatients = 20
 DoylePatients = list()
 
@@ -50,8 +51,8 @@ for p in range(nPatients):
         runSdeint(DoylePatient[1], x_0[1].to(device), d[1].to(device), d_tVec.to(device), simDuration)
 
     DoylePatients.append(DoylePatient)
-
-pickle.dump(DoylePatients, open(fileName, "wb"))
+if enableSaveFile:
+    pickle.dump(DoylePatients, open(fileName, "wb"))
 
 '''
 # plotting the trajectories:

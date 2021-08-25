@@ -53,8 +53,16 @@ class DoyleSDE(torch.nn.Module):
 
         self.K, self.controlBias = self.calc_gain_K(self.referenceValues)
 
-        self.noiseStdFactor = 2.5e-3
-        self.noiseStd = self.noiseStdFactor * self.referenceValues["x_L"][:, 0]
+        #self.noiseStdFactor = 2.5e-3
+        #self.noiseStd = self.noiseStdFactor * self.referenceValues["x_L"][:, 0]
+
+        # SNR definition for process noise (not sure its true because of continuous signal)
+        # SNR = sigEnergy / var(noise)
+        # var(noise) = sigEnergy / SNR
+        # std(noise) = |sigAmp| / sqrt(SNR)
+        self.SNR = 52.04 # db
+        self.SNR_lin = np.power(10, self.SNR/10)
+        self.noiseStd = torch.abs(self.referenceValues["x_L"][:, 0]) / np.sqrt(self.SNR_lin)
 
     def controller_unitLessParams_to_unitParams(self, tilde_q_as, tilde_q_o2, tilde_q_H, x_L, u_L):
         return tilde_q_as*x_L[0], tilde_q_o2*x_L[3], tilde_q_H*u_L
