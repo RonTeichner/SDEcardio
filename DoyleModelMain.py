@@ -14,15 +14,27 @@ batch_size = 2
 enableInputWorkload = True
 
 # create a dataset of patients, each patient has a low and high workload profile and a trajectory at each profile:
-fileName = 'DoylePatientsDataset.pt'
-enableSaveFile = False
+fileName = 'DoylePatientsDataset_noNoise_noControl.pt'
+enableSaveFile = True
 nPatients = 20
+
+disableNoise = True
+disableController = True
+
 DoylePatients = list()
 
 for p in range(nPatients):
     print(f'starting creating patient {p+1} out of {nPatients}')
     # creating two profiles of the same patient, one for each workload:
     DoylePatient = createRandomPatient()
+
+    if disableNoise:
+        for i in range(len(DoylePatient)):
+            DoylePatient[i].noiseStd = torch.zeros_like(DoylePatient[i].noiseStd)
+
+    if disableController:
+        for i in range(len(DoylePatient)):
+            DoylePatient[i].enableController = False
 
     # creating the starting point to be a fixed point of the system in order to match the figures in the article:
     x_0 = list()
