@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 def R_L(cj, cm, L):
     N = cj.shape[0]
@@ -28,7 +30,7 @@ print(f'series var manual calc: {(np.power(0.25-s.mean(),2) + np.power(0.5-s.mea
 N = 100
 x = np.random.rand(N)
 nanIndexes = [10,20,30,40,50,60,70,80,90]
-#x[nanIndexes] = np.nan
+x[nanIndexes] = np.nan
 lagValues = np.arange(-(N-2),N-1)
 #lagValues = np.array([N-1-1])
 maxDiff = 0.0
@@ -38,6 +40,36 @@ for lag in lagValues:
     #print(f'my autocorr with lag = {lag} is {autoCorr_self}, pd autocorr is {autocorr_pd}')
     maxDiff = np.max((np.abs(autocorr_pd - autoCorr_self), maxDiff))
 print(f'maxDiff between pandas autocorr and self calculated: {maxDiff}')
+
+x = np.random.randn(100, 5, 3)
+x[:,:,1] = x[:,:,1]*1000
+x[:,:,2] = x[:,:,2]*1000
+nanIndexes = [10,20,30,40,50,60,70,80,90]
+x[nanIndexes] = np.nan
+
+#hist, binEdges = np.histogram(x.reshape((100, -1))[:, 2], bins=100, density=True)
+#cdf = np.cumsum(hist)
+
+plt.figure()
+n_bins = 1000
+feature0, feature1 = x.reshape((100, -1))[:, 2], x.reshape((100, -1))[:, 1]
+feature0, feature1 = feature0[np.logical_not(np.isnan(feature0))], feature1[np.logical_not(np.isnan(feature1))]
+n, bins, _ = plt.hist([feature0, feature1], n_bins, histtype='step', density=True, cumulative=True, label='hist')
+plt.clf() # eliminates the matplotlib plot
+bins = bins[:-1]
+
+plt.xlabel(r'$\sigma_e^2$ [dbW]')
+plt.grid()
+
+# A text mixing normal text and math text.
+msg = (r"Normal Text. $Text\ in\ math\ mode:\ "r"\int_{0}^{\infty } x^2 dx$")
+
+# Set the text in the plot.
+plt.plot(bins, n[0, :], label='me_0')
+plt.plot(bins, n[1, :], label='me_1')
+plt.text(0.1, 0.9, 'matplotlib')#, horizontalalignment='center', verticalalignment='center')#, transform=ax.transAxes)
+plt.legend()
+plt.show()
 
 
 
