@@ -8,7 +8,7 @@ for p in range(nPatients):
     nBatchesPerPatient[p] = np.random.randint(1,4,1)
 nTotalPatientsBatches = int(nBatchesPerPatient.sum())
 
-SigMat = np.random.rand(nTimePoints, nTotalPatientsBatches, nFeatures)
+SigMat = np.random.randn(nTimePoints, nTotalPatientsBatches, nFeatures)
 for f in range(SigMat.shape[2]):
     SigMat[:, :, f] = np.power(10, f) * SigMat[:, :, f]
 
