@@ -41,7 +41,8 @@ fs = 2  # hz
 patientMetaDataTextBox = ["age", "weight"]
 slidingWindowSize = 11 # window size of autocorr
 autoCorrMaxLag = 5
+slidingWindowsWingap = int(slidingWindowSize/2)
 figuresDirName = "exampleDataAnalysis"
 #np.seterr(all='raise')
-dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
+dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 plt.close()

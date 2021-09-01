@@ -11,10 +11,13 @@ SigMatHighDataArray_noNoise, MetaDataHighDataArray_noNoise, SigMatFeatureNames_n
 SigMatLowDataArray_noNoise_noControl, MetaDataLowDataArray_noNoise_noControl, SigMatFeatureNames_noNoise_noControl, SigMatFeatureUnits_noNoise_noControl, MetaDataFeatureNames_noNoise_noControl = ndarrays_DoylePatientsDataset_noNoise_noControl[0]
 SigMatHighDataArray_noNoise_noControl, MetaDataHighDataArray_noNoise_noControl, SigMatFeatureNames_noNoise_noControl, SigMatFeatureUnits_noNoise_noControl, MetaDataFeatureNames_noNoise_noControl = ndarrays_DoylePatientsDataset_noNoise_noControl[1]
 
-
-slidingWindowSize = 30+1
-autoCorrMaxLag = 30+1
 fs = 1
+slidingWindowSize = int(30*fs)
+if np.mod(slidingWindowSize, 2) == 0:
+    slidingWindowSize = slidingWindowSize + 1
+autoCorrMaxLag = int(30*fs)
+slidingWindowsWingap = int(slidingWindowSize/2)
+
 
 ##################3
 figuresDirName = 'lowWorkload_noNoise'
@@ -28,7 +31,7 @@ PatientClassification = ['Low']*P
 MetaData = MetaDataLowDataArray_noNoise
 MetaDataFeatureNames = MetaDataFeatureNames_noNoise
 patientMetaDataTextBox = ''
-dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
+dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 
 ##################3
 figuresDirName = 'highWorkload_noNoise'
@@ -42,7 +45,7 @@ PatientIds = np.arange(1,1+P).tolist()
 PatientClassification = ['High']*P
 MetaDataFeatureNames = MetaDataFeatureNames_noNoise
 patientMetaDataTextBox = ''
-dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
+dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 
 ##################3
 figuresDirName = 'lowWorkload_noNoise_noControl'
@@ -56,7 +59,7 @@ PatientIds = np.arange(1,1+P).tolist()
 PatientClassification = ['Low_noControl']*P
 MetaDataFeatureNames = MetaDataFeatureNames_noNoise_noControl
 patientMetaDataTextBox = ''
-dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
+dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 
 ##################3
 figuresDirName = 'highWorkload_noNoise_noControl'
@@ -70,6 +73,6 @@ PatientIds = np.arange(1,1+P).tolist()
 PatientClassification = ['High_noControl']*P
 MetaDataFeatureNames = MetaDataFeatureNames_noNoise_noControl
 patientMetaDataTextBox = ''
-dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
+dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 
 

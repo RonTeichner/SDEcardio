@@ -3,7 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-def dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, enableSave=True):
+def dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, enableSave=True):
+    slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag = int(slidingWindowSize), int(slidingWindowsWingap), int(autoCorrMaxLag)
+
     if not(os.path.isdir("./" + figuresDirName)): os.makedirs("./" + figuresDirName)
 
     print('starting raw data analysis')
@@ -19,18 +21,19 @@ def dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, 
     singleMatAnalysis("Mahalanobis", MahMat, SigMatFeatureNames, MahMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, mahalanobisFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
 
     print('starting auto-corr analysis')
-    AcSwMat = AutoCorrSw(SigMat, slidingWindowSize)
+    AcSwMat = AutoCorrSw(SigMat, slidingWindowSize, slidingWindowsWingap)
+    fs_SW = fs/slidingWindowsWingap
     AcSwMatFiguresDirName = figuresDirName + "/autoCorrSw"
     if not (os.path.isdir("./" + AcSwMatFiguresDirName)): os.makedirs("./" + AcSwMatFiguresDirName)
     AcSwMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-    singleMatAnalysis("AutoCorrSw", AcSwMat, SigMatFeatureNames, AcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, AcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
+    singleMatAnalysis("AutoCorrSw", AcSwMat, SigMatFeatureNames, AcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs_SW, patientMetaDataTextBox, AcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
 
     print('starting Mahalanobis auto-corr analysis')
     MahAcSwMat = MahalanobisDistance(AcSwMat)
     MahAcSwMatFiguresDirName = figuresDirName + "/MahAutoCorrSw"
     if not (os.path.isdir("./" + MahAcSwMatFiguresDirName)): os.makedirs("./" + MahAcSwMatFiguresDirName)
     MahAcSwMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-    singleMatAnalysis("MahAutoCorrSw", MahAcSwMat, SigMatFeatureNames, MahAcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, MahAcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
+    singleMatAnalysis("MahAutoCorrSw", MahAcSwMat, SigMatFeatureNames, MahAcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs_SW, patientMetaDataTextBox, MahAcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
 
 def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
@@ -106,7 +109,9 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
             for f in range(F):
                 title = matrixName + "_" + populationName + "_" + "_scatter"
                 myScatter(MetaDataBatchPopulation[:, m], CvVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
-                if enableSave: plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+                if enableSave:
+                    plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+                    plt.close()
 
 def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
@@ -121,7 +126,9 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
     else:
         title = matrixName + "_" + populationName + "_" + PatientId + "_Cv(set-points)"
     myBarPlot(SigMatFeatureNames, CvVec[0], title)  # CvVec[0] because it is a union of all patients
-    if enableSave: plt.savefig("./" + figuresDirName + "/" + title + ".png")
+    if enableSave:
+        plt.savefig("./" + figuresDirName + "/" + title + ".png")
+        plt.close()
 
     # mean:
     if singleBatch:
@@ -129,7 +136,9 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
     else:
         title = matrixName + "_" + populationName + "_" + PatientId + "_Mean"
     myBarPlot(SigMatFeatureNames, MeanVec[0], title)  # CvVec[0] because it is a union of all patients
-    if enableSave: plt.savefig("./" + figuresDirName + "/" + title + ".png")
+    if enableSave:
+        plt.savefig("./" + figuresDirName + "/" + title + ".png")
+        plt.close()
 
     if singleBatch:
         assert P == 1
@@ -140,7 +149,9 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
         for f in range(F):
             title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_" + SigMatFeatureNames[f]
             myPlot(tVec, SigMat[:, 0, f], label=SigMatFeatureNames[f], title=title, xlabel='sec', ylabel=SigMatFeatureUnits[f])
-            if enableSave: plt.savefig("./" + figuresDirName + "/" + title + ".png")
+            if enableSave:
+                plt.savefig("./" + figuresDirName + "/" + title + ".png")
+                plt.close()
 
     else:
         AcVec = np.nan
@@ -160,14 +171,18 @@ def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, 
     plt.figure()
     title = matrixName + "_" + populationName + "_normalizedVar"
     myBarPlot(SigMatFeatureNames, NvVec, title)
-    if enableSave: plt.savefig("./" + figuresDirName + "/" + title + ".png")
+    if enableSave:
+        plt.savefig("./" + figuresDirName + "/" + title + ".png")
+        plt.close()
 
     # CV(set-points)
     CvOfSetPoints = CoefVarOfSetPoints(SigMat)
     plt.figure()
     title = matrixName + "_" + populationName + "_Cv(set-points)"
     myBarPlot(SigMatFeatureNames, CvOfSetPoints, title)
-    if enableSave: plt.savefig("./" + figuresDirName + "/" + title + ".png")
+    if enableSave:
+        plt.savefig("./" + figuresDirName + "/" + title + ".png")
+        plt.close()
 
 def MahalanobisDistance(SigMat):
     N, P, F = SigMat.shape
@@ -209,14 +224,16 @@ def AutoCorrSpecificLag(SigMat, L):
             if np.isnan(AcLagVec[p, f]): AcLagVec[p, f] = 0.0
     return AcLagVec
 
-def AutoCorrSw(SigMat, W):
-    assert np.mod(W, 2) == 1
+def AutoCorrSw(SigMat, windowSize, wingap):
+    assert np.mod(windowSize, 2) == 1
     N, P, F = SigMat.shape
-    h = int(0.5*(W-1))
+    h = int(0.5*(windowSize-1))
     paddedSigMat = np.concatenate((np.zeros((h, P, F)), SigMat, np.zeros((h, P, F))), axis=0)
-    AcSwMat = np.zeros_like(SigMat)
-    for k in range(N):
-        startIndex = k
+    AcSwMat = np.zeros_like(SigMat[::wingap])
+
+    for k in range(AcSwMat.shape[0]):
+        tilde_k = k*wingap
+        startIndex = tilde_k
         stopIndex = startIndex + 2*h + 1
         AcSwMat[k] = TotalAutoCorr(paddedSigMat[startIndex:stopIndex], autoCorrMaxLag=np.inf)
     return AcSwMat
@@ -293,7 +310,9 @@ def cdfPlot(SigMat, featuresShareUnits, matrixName, populationName, patientId, b
         title = matrixName + "_" + populationName + "_" + patientId + "_" + batchId + "_CDF"
         for f in range(F):
             myPlot(binsMat[p, f, :], CdfMat[:, p, f], label=SigMatFeatureNames[f], title=title)
-        if enableSave: plt.savefig("./" + figuresDirName + "/" + title + ".png")
+        if enableSave:
+            plt.savefig("./" + figuresDirName + "/" + title + ".png")
+            plt.close()
 
     else:  # plot each cdf curve in a new figure
         p = 0  # due to union of all patients
@@ -301,7 +320,9 @@ def cdfPlot(SigMat, featuresShareUnits, matrixName, populationName, patientId, b
             plt.figure()
             title = matrixName + "_" + populationName + "_" + patientId + "_" + batchId + "_CDF_" + SigMatFeatureNames[f]
             myPlot(binsMat[p, f, :], CdfMat[:, p, f], label=SigMatFeatureNames[f], title=title, xlabel=SigMatFeatureUnits[f])
-            if enableSave: plt.savefig("./" + figuresDirName + "/" + title + ".png")
+            if enableSave:
+                plt.savefig("./" + figuresDirName + "/" + title + ".png")
+                plt.close()
 
 
 def myPlot(x, y, label='', title='', xlabel='', ylabel=''):
@@ -311,7 +332,6 @@ def myPlot(x, y, label='', title='', xlabel='', ylabel=''):
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
-    plt.close()
 
 def myScatter(x, y, label='', title='', xlabel='', ylabel=''):
     plt.scatter(x, y, label=label)
@@ -320,13 +340,11 @@ def myScatter(x, y, label='', title='', xlabel='', ylabel=''):
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
-    plt.close()
 
 
 def myBarPlot(names, values, title):
     plt.bar(names, values)
     plt.title(title)
-    plt.close()
 
 def R_L(cj, cm, L):
     N = cj.shape[0]
