@@ -40,15 +40,14 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
     metaData_F = len(MetaDataFeatureNames)
 
     # analysis on all patients:
-    populationName = 'all'
     allPatientsFigureDirName = figuresDirName + "/allPatientsUnion"
     if not (os.path.isdir("./" + allPatientsFigureDirName)): os.makedirs("./" + allPatientsFigureDirName)
-    allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, allPatientsFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
+    allPatientsAnalysis(matrixName, 'all', SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, allPatientsFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
 
     # analysis per population:
     populations = list(set(PatientClassification))
     for population in populations:
-        specificPopulationFigureDirName = figuresDirName + "/" + population
+        specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         if not (os.path.isdir("./" + specificPopulationFigureDirName)): os.makedirs("./" + specificPopulationFigureDirName)
         populationIndexes = stringListCompare(PatientClassification, population)
         SigMatSinglePopulation = SigMat[:, populationIndexes, :]
@@ -56,7 +55,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
 
     # analysis per patient:
     for population in populations:
-        specificPopulationFigureDirName = figuresDirName + "/" + population
+        specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         populationIndexes = stringListCompare(PatientClassification, population)
         SigMatSinglePopulation = SigMat[:, populationIndexes, :]
         PatientIdSinglePopulation = np.array(PatientIds)[populationIndexes]
@@ -71,11 +70,11 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
             CvVecPopulation[p], _, _ = singlePatientAnalysis(False, matrixName, population, SigMatSinglePopulationSinglePatient, SigMatFeatureNames, SigMatFeatureUnits, patientId, '', PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
 
         # plot CDF of Cv values for population:
-        cdfPlot(CvVecPopulation[None, :, :], featuresShareUnits, matrixName, population, 'CV', '', SigMatFeatureNames, SigMatFeatureUnits, specificPopulationFigureDirName, enableSave)
+        cdfPlot(CvVecPopulation[None, :, :], featuresShareUnits, matrixName, population, 'CV', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
 
     # analysis per batch of patient:
     for population in populations:
-        specificPopulationFigureDirName = figuresDirName + "/" + population
+        specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         populationIndexes = stringListCompare(PatientClassification, population)
         SigMatSinglePopulation = SigMat[:, populationIndexes, :]
         MetaDataSinglePopulation = MetaData[populationIndexes, :]
@@ -93,7 +92,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
             nBatches = SigMatSinglePopulationSinglePatient.shape[1]
             for b in range(nBatches):
                 batchId = str(b)
-                specificPopulationSpecificPatientBatchFigureDirName = specificPopulationSpecificPatientFigureDirName + "batch_" + batchId
+                specificPopulationSpecificPatientBatchFigureDirName = specificPopulationSpecificPatientFigureDirName + "/" + "batch_" + batchId
                 if not (os.path.isdir("./" + specificPopulationSpecificPatientBatchFigureDirName)): os.makedirs("./" + specificPopulationSpecificPatientBatchFigureDirName)
                 SigMatSinglePopulationSinglePatientSingleBatch = SigMatSinglePopulationSinglePatient[:, b, :][:, None, :]
                 MetaDataSinglePopulationSinglePatientSingleBatch = MetaDataSinglePopulationSinglePatient[b, :]
@@ -102,19 +101,39 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
                 MeanVecBatchPopulation[AcVecIndex], CvVecBatchPopulation[AcVecIndex], MetaDataBatchPopulation[AcVecIndex] = MeanVec[0], CvVec[0], MetaDataSinglePopulationSinglePatientSingleBatch
 
         # plot CDF of Ac values for population:
-        cdfPlot(AcVecBatchPopulation[None, :, :], featuresShareUnits, matrixName, population, 'AC', '', SigMatFeatureNames, SigMatFeatureUnits, specificPopulationFigureDirName, enableSave)
+        cdfPlot(AcVecBatchPopulation[None, :, :], True, matrixName, population, 'AC', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+
+        # plot Mean of Ac values for population:
+        title = matrixName + "_" + population + "_" + "MeanAc"
+        myBarPlot(SigMatFeatureNames, AcVecBatchPopulation.mean(axis=0), title)
+        if enableSave:
+            plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+            plt.close()
 
         # plot scatter plots per metaDatafeature for population:
         for m, metaDataFeature in enumerate(MetaDataFeatureNames):
             for f in range(F):
-                title = matrixName + "_" + populationName + "_" + "_scatter"
+                title = matrixName + "_" + population + "_" + "_scatter_" + "CV_" + SigMatFeatureNames[f] + "_" + metaDataFeature
                 myScatter(MetaDataBatchPopulation[:, m], CvVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
+                if enableSave:
+                    plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+                    plt.close()
+
+                title = matrixName + "_" + population + "_" + "_scatter_" + "Ac_" + SigMatFeatureNames[f] + "_" + metaDataFeature
+                myScatter(MetaDataBatchPopulation[:, m], AcVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
+                if enableSave:
+                    plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+                    plt.close()
+
+                title = matrixName + "_" + population + "_" + "_scatter_" + "Mean_" + SigMatFeatureNames[f] + "_" + metaDataFeature
+                myScatter(MetaDataBatchPopulation[:, m], MeanVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
                 if enableSave:
                     plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
                     plt.close()
 
 def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
+    if singleBatch: assert P == 1
 
     # CDF plot:
     cdfPlot(SigMat, featuresShareUnits, matrixName, populationName, PatientId, batchId, SigMatFeatureNames, SigMatFeatureUnits, figuresDirName, enableSave)
@@ -141,8 +160,13 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
         plt.close()
 
     if singleBatch:
-        assert P == 1
         AcVec = TotalAutoCorr(SigMat, autoCorrMaxLag)
+        title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_Ac"
+        myBarPlot(SigMatFeatureNames, AcVec[0], title)
+        if enableSave:
+            plt.savefig("./" + figuresDirName + "/" + title + ".png")
+            plt.close()
+
 
         # plot trajectories:
         tVec = np.arange(0, N) / fs
@@ -168,7 +192,6 @@ def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, 
 
     # normalized variance:
     NvVec = NormalizedVariacne(SigMat)
-    plt.figure()
     title = matrixName + "_" + populationName + "_normalizedVar"
     myBarPlot(SigMatFeatureNames, NvVec, title)
     if enableSave:
@@ -176,13 +199,21 @@ def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, 
         plt.close()
 
     # CV(set-points)
-    CvOfSetPoints = CoefVarOfSetPoints(SigMat)
-    plt.figure()
+    CvOfSetPoints, _, MeansOfMeansVec = CoefVarOfSetPoints(SigMat)
     title = matrixName + "_" + populationName + "_Cv(set-points)"
     myBarPlot(SigMatFeatureNames, CvOfSetPoints, title)
     if enableSave:
         plt.savefig("./" + figuresDirName + "/" + title + ".png")
         plt.close()
+
+    # Mean
+    title = matrixName + "_" + populationName + "_Mean"
+    myBarPlot(SigMatFeatureNames, MeansOfMeansVec, title)
+    if enableSave:
+        plt.savefig("./" + figuresDirName + "/" + title + ".png")
+        plt.close()
+
+
 
 def MahalanobisDistance(SigMat):
     N, P, F = SigMat.shape
@@ -264,7 +295,7 @@ def CoefVarOfSetPoints(SigMat):
 
     assert np.power(MeansOfMeansVec, 2).min() > 0
     CvOfSetPoints = np.sqrt(np.divide(VarOfMeansVec, np.power(MeansOfMeansVec, 2)))
-    return CvOfSetPoints
+    return CvOfSetPoints, MeanVec, MeansOfMeansVec
 
 def NormalizedVariacne(SigMat):
     N, P, F = SigMat.shape
@@ -334,6 +365,8 @@ def myPlot(x, y, label='', title='', xlabel='', ylabel=''):
     plt.title(title)
 
 def myScatter(x, y, label='', title='', xlabel='', ylabel=''):
+    pearsonCorr = round(pd.Series(x).corr(pd.Series(y)), 2)
+    title = title + ' p.c=' + str(pearsonCorr)
     plt.scatter(x, y, label=label)
     plt.legend()
     plt.grid()

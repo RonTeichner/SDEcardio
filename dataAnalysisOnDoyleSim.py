@@ -18,9 +18,10 @@ if np.mod(slidingWindowSize, 2) == 0:
 autoCorrMaxLag = int(30*fs)
 slidingWindowsWingap = int(slidingWindowSize/2)
 
+dirName = 'DoyleSimAnalysis'
 
 ##################3
-figuresDirName = 'lowWorkload_noNoise'
+figuresDirName = dirName + '/lowWorkload_noNoise'
 print('starting ' + figuresDirName)
 SigMat = SigMatLowDataArray_noNoise
 SigMatFeatureNames = SigMatFeatureNames_noNoise
@@ -34,7 +35,7 @@ patientMetaDataTextBox = ''
 dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 
 ##################3
-figuresDirName = 'highWorkload_noNoise'
+figuresDirName = dirName + '/highWorkload_noNoise'
 print('starting ' + figuresDirName)
 SigMat = SigMatHighDataArray_noNoise
 MetaData = MetaDataHighDataArray_noNoise
@@ -48,7 +49,7 @@ patientMetaDataTextBox = ''
 dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 
 ##################3
-figuresDirName = 'lowWorkload_noNoise_noControl'
+figuresDirName = dirName + '/lowWorkload_noNoise_noControl'
 print('starting ' + figuresDirName)
 SigMat = SigMatLowDataArray_noNoise
 MetaData = MetaDataLowDataArray_noNoise_noControl
@@ -62,7 +63,7 @@ patientMetaDataTextBox = ''
 dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
 
 ##################3
-figuresDirName = 'highWorkload_noNoise_noControl'
+figuresDirName = dirName + 'highWorkload_noNoise_noControl'
 print('starting ' + figuresDirName)
 SigMat = SigMatHighDataArray_noNoise_noControl
 MetaData = MetaDataHighDataArray_noNoise_noControl
