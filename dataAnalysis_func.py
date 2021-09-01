@@ -3,36 +3,36 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-def dataAnalysis(W, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, enableSave=True):
+def dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, enableSave=True):
     if not(os.path.isdir("./" + figuresDirName)): os.makedirs("./" + figuresDirName)
 
     print('starting raw data analysis')
     rawDataFiguresDirName = figuresDirName + "/rawData"
     if not (os.path.isdir("./" + rawDataFiguresDirName)): os.makedirs("./" + rawDataFiguresDirName)
-    singleMatAnalysis("rawData", SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, rawDataFiguresDirName, featuresShareUnits=False, enableSave=enableSave)
+    singleMatAnalysis("rawData", SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, rawDataFiguresDirName, autoCorrMaxLag, featuresShareUnits=False, enableSave=enableSave)
 
     print('starting Mahalanobis analysis')
     MahMat = MahalanobisDistance(SigMat)
     mahalanobisFiguresDirName = figuresDirName + "/mahalanobis"
     if not (os.path.isdir("./" + mahalanobisFiguresDirName)): os.makedirs("./" + mahalanobisFiguresDirName)
     MahMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-    singleMatAnalysis("Mahalanobis", MahMat, SigMatFeatureNames, MahMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, mahalanobisFiguresDirName, featuresShareUnits=True, enableSave=enableSave)
+    singleMatAnalysis("Mahalanobis", MahMat, SigMatFeatureNames, MahMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, mahalanobisFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
 
     print('starting auto-corr analysis')
-    AcSwMat = AutoCorrSw(SigMat, W)
+    AcSwMat = AutoCorrSw(SigMat, slidingWindowSize)
     AcSwMatFiguresDirName = figuresDirName + "/autoCorrSw"
     if not (os.path.isdir("./" + AcSwMatFiguresDirName)): os.makedirs("./" + AcSwMatFiguresDirName)
     AcSwMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-    singleMatAnalysis("AutoCorrSw", AcSwMat, SigMatFeatureNames, AcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, AcSwMatFiguresDirName, featuresShareUnits=True, enableSave=enableSave)
+    singleMatAnalysis("AutoCorrSw", AcSwMat, SigMatFeatureNames, AcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, AcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
 
     print('starting Mahalanobis auto-corr analysis')
     MahAcSwMat = MahalanobisDistance(AcSwMat)
     MahAcSwMatFiguresDirName = figuresDirName + "/MahAutoCorrSw"
     if not (os.path.isdir("./" + MahAcSwMatFiguresDirName)): os.makedirs("./" + MahAcSwMatFiguresDirName)
     MahAcSwMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-    singleMatAnalysis("MahAutoCorrSw", MahAcSwMat, SigMatFeatureNames, MahAcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, MahAcSwMatFiguresDirName, featuresShareUnits=True, enableSave=enableSave)
+    singleMatAnalysis("MahAutoCorrSw", MahAcSwMat, SigMatFeatureNames, MahAcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, MahAcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
 
-def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, featuresShareUnits, enableSave):
+def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
     metaData_F = len(MetaDataFeatureNames)
 
@@ -40,7 +40,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
     populationName = 'all'
     allPatientsFigureDirName = figuresDirName + "/allPatientsUnion"
     if not (os.path.isdir("./" + allPatientsFigureDirName)): os.makedirs("./" + allPatientsFigureDirName)
-    allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, allPatientsFigureDirName, featuresShareUnits, enableSave)
+    allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, allPatientsFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
 
     # analysis per population:
     populations = list(set(PatientClassification))
@@ -49,7 +49,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
         if not (os.path.isdir("./" + specificPopulationFigureDirName)): os.makedirs("./" + specificPopulationFigureDirName)
         populationIndexes = stringListCompare(PatientClassification, population)
         SigMatSinglePopulation = SigMat[:, populationIndexes, :]
-        allPatientsAnalysis(matrixName, population, SigMatSinglePopulation, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationFigureDirName, featuresShareUnits, enableSave)
+        allPatientsAnalysis(matrixName, population, SigMatSinglePopulation, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
 
     # analysis per patient:
     for population in populations:
@@ -65,7 +65,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
             if not (os.path.isdir("./" + specificPopulationSpecificPatientFigureDirName)): os.makedirs("./" + specificPopulationSpecificPatientFigureDirName)
             patientIndexes = PatientIdSinglePopulation == patient
             SigMatSinglePopulationSinglePatient = SigMatSinglePopulation[:, patientIndexes, :]
-            CvVecPopulation[p], _, _ = singlePatientAnalysis(False, matrixName, population, SigMatSinglePopulationSinglePatient, SigMatFeatureNames, SigMatFeatureUnits, patientId, '', PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientFigureDirName, featuresShareUnits, enableSave)
+            CvVecPopulation[p], _, _ = singlePatientAnalysis(False, matrixName, population, SigMatSinglePopulationSinglePatient, SigMatFeatureNames, SigMatFeatureUnits, patientId, '', PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
 
         # plot CDF of Cv values for population:
         cdfPlot(CvVecPopulation[None, :, :], featuresShareUnits, matrixName, population, 'CV', '', SigMatFeatureNames, SigMatFeatureUnits, specificPopulationFigureDirName, enableSave)
@@ -95,7 +95,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
                 SigMatSinglePopulationSinglePatientSingleBatch = SigMatSinglePopulationSinglePatient[:, b, :][:, None, :]
                 MetaDataSinglePopulationSinglePatientSingleBatch = MetaDataSinglePopulationSinglePatient[b, :]
                 AcVecIndex = AcVecIndex + 1
-                CvVec, MeanVec, AcVecBatchPopulation[AcVecIndex] = singlePatientAnalysis(True, matrixName, population, SigMatSinglePopulationSinglePatientSingleBatch, SigMatFeatureNames, SigMatFeatureUnits, patientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientBatchFigureDirName, featuresShareUnits, enableSave)
+                CvVec, MeanVec, AcVecBatchPopulation[AcVecIndex] = singlePatientAnalysis(True, matrixName, population, SigMatSinglePopulationSinglePatientSingleBatch, SigMatFeatureNames, SigMatFeatureUnits, patientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientBatchFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
                 MeanVecBatchPopulation[AcVecIndex], CvVecBatchPopulation[AcVecIndex], MetaDataBatchPopulation[AcVecIndex] = MeanVec[0], CvVec[0], MetaDataSinglePopulationSinglePatientSingleBatch
 
         # plot CDF of Ac values for population:
@@ -108,7 +108,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
                 myScatter(MetaDataBatchPopulation[:, m], CvVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
                 if enableSave: plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
 
-def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, featuresShareUnits, enableSave):
+def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
 
     # CDF plot:
@@ -133,7 +133,7 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
 
     if singleBatch:
         assert P == 1
-        AcVec = TotalAutoCorr(SigMat)
+        AcVec = TotalAutoCorr(SigMat, autoCorrMaxLag)
 
         # plot trajectories:
         tVec = np.arange(0, N) / fs
@@ -148,7 +148,7 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
     return CvVec, MeanVec, AcVec
 
 
-def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, featuresShareUnits, enableSave):
+def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
 
     # CDF plot:
@@ -184,13 +184,14 @@ def MahalanobisDistance(SigMat):
     MahMat = np.sqrt(np.divide(numerator, denominator))
     return MahMat
 
-def TotalAutoCorr(SigMat):
+def TotalAutoCorr(SigMat, autoCorrMaxLag):
     N, P, F = SigMat.shape
     AcVec = np.zeros((P, F))
+    minLag, maxLag = int(- np.min((N-2, autoCorrMaxLag))), int(1+np.min((N-2, autoCorrMaxLag)))
     for p in range(P):
         for f in range(F):
             summed = 0
-            for L in range(-(N-2), N-1):
+            for L in range(minLag, maxLag):
                 AcLagVec = AutoCorrSpecificLag(SigMat[:, p, f][:, None, None], L)
                 i0 = np.max((L, 0))
                 i1 = N - 1 + np.min((0, L))
@@ -217,7 +218,7 @@ def AutoCorrSw(SigMat, W):
     for k in range(N):
         startIndex = k
         stopIndex = startIndex + 2*h + 1
-        AcSwMat[k] = TotalAutoCorr(paddedSigMat[startIndex:stopIndex])
+        AcSwMat[k] = TotalAutoCorr(paddedSigMat[startIndex:stopIndex], autoCorrMaxLag=np.inf)
     return AcSwMat
 
 
