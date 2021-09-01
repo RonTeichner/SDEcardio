@@ -1,6 +1,8 @@
 import numpy as np
 from dataAnalysis_func import *
 
+#np.random.seed(seed=2589629)
+
 # create imaginary data set:
 nTimePoints, nPatients, nFeatures = 100, 12, 3
 nBatchesPerPatient = np.ndarray(nPatients, dtype=int)
@@ -13,8 +15,10 @@ for f in range(SigMat.shape[2]):
     SigMat[:, :, f] = np.power(10, f) * SigMat[:, :, f]
 
 for p in range(SigMat.shape[1]):
-    nanIndexesTime = np.random.randint(0, nTimePoints, 20)
-    SigMat[nanIndexesTime] = np.nan
+    nanIndexesTime = np.random.randint(0, nTimePoints, 5)
+    #SigMat[nanIndexesTime] = np.nan
+
+assert np.logical_not(np.isnan(SigMat)).any()
 
 SigMatFeatureNames = ["bp", "hr", "rr"]
 SigMatFeatureUnits = ["mmHg", "beats@min", "resp@min"]
@@ -28,14 +32,15 @@ PatientIds = PatientIds.tolist()
 PatientClassification = ["control"]*nBatchesPerPatient[:int(nPatients/2)].sum() + ["cardio"]*nBatchesPerPatient[int(nPatients/2):].sum()
 
 nMetaDataFeatures = 2
-MetaData = 100*np.random.rand(SigMat.shape[1], nMetaDataFeatures)
+MetaData = 100*np.random.randn(SigMat.shape[1], nMetaDataFeatures)
 
 MetaDataFeatureNames = ["age", "weight"]
 
 fs = 2  # hz
 
 patientMetaDataTextBox = ["age", "weight"]
-
+W = 11 # window size of autocorr
 figuresDirName = "exampleDataAnalysis"
-dataAnalysis(SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
-plt.show()
+#np.seterr(all='raise')
+dataAnalysis(W, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
+plt.close()
