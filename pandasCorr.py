@@ -36,6 +36,8 @@ lagValues = np.arange(-(N-2),N-1)
 maxDiff = 0.0
 for lag in lagValues:
     autocorr_pd = pd.Series(x).autocorr(lag=lag)
+    if np.isnan(x).any() and np.logical_not(np.isnan(autocorr_pd)):
+        print('nan values in signal but autocorr res is not nan')
     autoCorr_self = R_L(x, x, lag)  # This calculates R(L,j,m) with support for nan values.
     #print(f'my autocorr with lag = {lag} is {autoCorr_self}, pd autocorr is {autocorr_pd}')
     maxDiff = np.max((np.abs(autocorr_pd - autoCorr_self), maxDiff))

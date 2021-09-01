@@ -13,11 +13,12 @@ SigMatHighDataArray_noNoise_noControl, MetaDataHighDataArray_noNoise_noControl, 
 
 
 slidingWindowSize = 30+1
-autoCorrMaxLag = 120
+autoCorrMaxLag = 30+1
 fs = 1
 
 ##################3
 figuresDirName = 'lowWorkload_noNoise'
+print('starting ' + figuresDirName)
 SigMat = SigMatLowDataArray_noNoise
 SigMatFeatureNames = SigMatFeatureNames_noNoise
 SigMatFeatureUnits = SigMatFeatureUnits_noNoise
@@ -31,7 +32,7 @@ dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigM
 
 ##################3
 figuresDirName = 'highWorkload_noNoise'
-print('starting' + figuresDirName)
+print('starting ' + figuresDirName)
 SigMat = SigMatHighDataArray_noNoise
 MetaData = MetaDataHighDataArray_noNoise
 SigMatFeatureNames = SigMatFeatureNames_noNoise
@@ -45,7 +46,7 @@ dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigM
 
 ##################3
 figuresDirName = 'lowWorkload_noNoise_noControl'
-print('starting' + figuresDirName)
+print('starting ' + figuresDirName)
 SigMat = SigMatLowDataArray_noNoise
 MetaData = MetaDataLowDataArray_noNoise_noControl
 SigMatFeatureNames = SigMatLowDataArray_noNoise_noControl
@@ -59,7 +60,7 @@ dataAnalysis(slidingWindowSize, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigM
 
 ##################3
 figuresDirName = 'highWorkload_noNoise_noControl'
-print('starting' + figuresDirName)
+print('starting ' + figuresDirName)
 SigMat = SigMatHighDataArray_noNoise_noControl
 MetaData = MetaDataHighDataArray_noNoise_noControl
 SigMatFeatureNames = SigMatFeatureNames_noNoise_noControl
