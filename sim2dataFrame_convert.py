@@ -36,10 +36,16 @@ for f, fileName in enumerate(simFileNames):
             Pas_k, O2_k = x_k[:, :, 0:1], x_k[:, :, 3:4]
             c_k = np.power(q_as, 2)*np.power(Pas_k - Pas_set, 2) + np.power(q_o2, 2)*np.power(O2_k - O2_set, 2) + np.power(q_H, 2)*np.power(u_k - H_set, 2)
 
+            tilde_q_as, tilde_q_o2, tilde_q_H = q_as/Pas_set[0], q_o2/O2_set[0], q_H/H_set[0, 0]
+            relativeDenominator = np.power(tilde_q_as, 2) + np.power(tilde_q_o2, 2) + np.power(tilde_q_H, 2)
+            relative_q_as, relative_q_o2, relative_q_H = np.power(tilde_q_as, 2)/relativeDenominator , np.power(tilde_q_o2, 2)/relativeDenominator, np.power(tilde_q_H, 2)/relativeDenominator
             # stuck everything into an ndarray
             for b in range(nBatches):
                 patientId = patientId + 1
                 patientIdVec = patientId*np.ones_like(tVec)
+
+                SigMatDataArraySingleBatch = np.concatenate((dnew[:, b], x_k[:, b, :], u_k[:, b], c_k[:, b]), axis=1)[:, None, :]
+                MetaDataDataArraySingleBatch = np.array([q_as, q_o2, q_H, relative_q_as, relative_q_o2, relative_q_H])[None, :]
 
                 patientDataArraySingleBatch_originalFields = np.concatenate((patientIdVec[:, None], tVec[:, None], dnew[:, b], x_k[:, b, :], u_k[:, b], c_k[:, b]), axis=1)
                 # ID, time, workload, Pas, Pvs, Pap, O2, HR, C
@@ -48,28 +54,47 @@ for f, fileName in enumerate(simFileNames):
                 # 'Time', 'HR_electrical' <= HR, 'HR_mechanical' <= HR, 'DBP' <= Pvs, 'MBP' <= Pas, 'SBP' <= Pap, 'RR' <= workload, 'ID', 'PP' <= Combination, 'CO' <= O2
 
                 # downsample to fs = 1:
+                SigMatDataArraySingleBatch = SigMatDataArraySingleBatch[::fs]
                 patientDataArraySingleBatch_originalFields, patientDataArraySingleBatch_AseelsFields = patientDataArraySingleBatch_originalFields[::fs], patientDataArraySingleBatch_AseelsFields[::fs]
                 if b == 0:
                     patientDataArray_originalFields, patientDataArray_AseelsFields = patientDataArraySingleBatch_originalFields, patientDataArraySingleBatch_AseelsFields
+                    SigMatDataArray = SigMatDataArraySingleBatch
+                    MetaDataDataArray = MetaDataDataArraySingleBatch
                 else:
                     patientDataArray_originalFields, patientDataArray_AseelsFields = np.concatenate((patientDataArray_originalFields, patientDataArraySingleBatch_originalFields), axis=0), np.concatenate((patientDataArray_AseelsFields, patientDataArraySingleBatch_AseelsFields), axis=0)
+                    SigMatDataArray = np.concatenate((SigMatDataArray, SigMatDataArraySingleBatch), axis=1)
+                    MetaDataDataArray = np.concatenate((MetaDataDataArray, MetaDataDataArraySingleBatch), axis=0)
 
             if w == 0:
                 if p == 0:
                     patientsLowDataArray_originalFields, patientsLowDataArray_AseelsFields = patientDataArray_originalFields, patientDataArray_AseelsFields
+                    SigMatLowDataArray = SigMatDataArray
+                    MetaDataLowDataArray = MetaDataDataArray
                 else:
                     patientsLowDataArray_originalFields, patientsLowDataArray_AseelsFields = np.concatenate((patientsLowDataArray_originalFields, patientDataArray_originalFields), axis=0), np.concatenate((patientsLowDataArray_AseelsFields, patientDataArray_AseelsFields), axis=0)
+                    SigMatLowDataArray = np.concatenate((SigMatLowDataArray, SigMatDataArray), axis=1)
+                    MetaDataLowDataArray = np.concatenate((MetaDataLowDataArray, MetaDataDataArray), axis=0)
             elif w == 1:
                 if p == 0:
                     patientsHighDataArray_originalFields, patientsHighDataArray_AseelsFields = patientDataArray_originalFields, patientDataArray_AseelsFields
+                    SigMatHighDataArray = SigMatDataArray
+                    MetaDataHighDataArray = MetaDataDataArray
                 else:
                     patientsHighDataArray_originalFields, patientsHighDataArray_AseelsFields = np.concatenate((patientsHighDataArray_originalFields, patientDataArray_originalFields), axis=0), np.concatenate((patientsHighDataArray_AseelsFields, patientDataArray_AseelsFields), axis=0)
+                    SigMatHighDataArray = np.concatenate((SigMatHighDataArray, SigMatDataArray), axis=1)
+                    MetaDataHighDataArray = np.concatenate((MetaDataHighDataArray, MetaDataDataArray), axis=0)
 
     dfLow_originalFields = pd.DataFrame(data=patientsLowDataArray_originalFields, columns=['ID', 'Time', 'Workload', 'Pas', 'Pvs', 'Pap', 'O2', 'HR', 'C'])
     dfHigh_originalFields = pd.DataFrame(data=patientsHighDataArray_originalFields, columns=['ID', 'Time', 'Workload', 'Pas', 'Pvs', 'Pap', 'O2', 'HR', 'C'])
 
     dfLow_AseelsFields = pd.DataFrame(data=patientsLowDataArray_AseelsFields, columns=['Time', 'HR_electrical', 'HR_mechanical', 'DBP', 'MBP', 'SBP', 'RR', 'ID', 'PP', 'CO'])
     dfHigh_AseelsFields = pd.DataFrame(data=patientsHighDataArray_AseelsFields, columns=['Time', 'HR_electrical', 'HR_mechanical', 'DBP', 'MBP', 'SBP', 'RR', 'ID', 'PP', 'CO'])
+
+    SigMatFeatureNames = ['workload','Pas','Pvs','Pap','O2v','HR','c_k']
+    SigMatFeatureUnits = ['watt','mmHg','mmHg','mmHg','L O2 / L blood','beats@sec','']
+    MetaDataFeatureNames = ['q_as', 'q_o2', 'q_H', 'rel_q_as', 'rel_q_o2', 'rel_q_H']
+    SigMatdataTuple = ([SigMatLowDataArray, MetaDataLowDataArray, SigMatFeatureNames, SigMatFeatureUnits, MetaDataFeatureNames], [SigMatHighDataArray, MetaDataHighDataArray, SigMatFeatureNames, SigMatFeatureUnits, MetaDataFeatureNames])
+    pickle.dump(SigMatdataTuple, open('ndarrays_' + fileName, "wb"))
 
     pickle.dump((dfLow_originalFields, dfHigh_originalFields), open('dataFrame_originalFields_' + fileName, "wb"))
     pickle.dump((dfLow_AseelsFields, dfHigh_AseelsFields), open('dataFrame_AseelsFields_' + fileName, "wb"))
