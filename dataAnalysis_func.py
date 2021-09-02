@@ -111,24 +111,26 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
             plt.close()
 
         # plot scatter plots per metaDatafeature for population:
+        specificPopulationScatterPlotsFigureDirName = specificPopulationFigureDirName + "/" + "ScatterPlots"
+        if not (os.path.isdir("./" + specificPopulationScatterPlotsFigureDirName)): os.makedirs("./" + specificPopulationScatterPlotsFigureDirName)
         for m, metaDataFeature in enumerate(MetaDataFeatureNames):
             for f in range(F):
                 title = matrixName + "_" + population + "_" + "_scatter_" + "CV_" + SigMatFeatureNames[f] + "_" + metaDataFeature
                 myScatter(MetaDataBatchPopulation[:, m], CvVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
                 if enableSave:
-                    plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+                    plt.savefig("./" + specificPopulationScatterPlotsFigureDirName + "/" + title + ".png")
                     plt.close()
 
                 title = matrixName + "_" + population + "_" + "_scatter_" + "Ac_" + SigMatFeatureNames[f] + "_" + metaDataFeature
                 myScatter(MetaDataBatchPopulation[:, m], AcVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
                 if enableSave:
-                    plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+                    plt.savefig("./" + specificPopulationScatterPlotsFigureDirName + "/" + title + ".png")
                     plt.close()
 
                 title = matrixName + "_" + population + "_" + "_scatter_" + "Mean_" + SigMatFeatureNames[f] + "_" + metaDataFeature
                 myScatter(MetaDataBatchPopulation[:, m], MeanVecBatchPopulation[:, f], label='', title=title, xlabel=metaDataFeature, ylabel=SigMatFeatureNames[f]+' '+SigMatFeatureUnits[f])
                 if enableSave:
-                    plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+                    plt.savefig("./" + specificPopulationScatterPlotsFigureDirName + "/" + title + ".png")
                     plt.close()
 
 def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
@@ -226,7 +228,7 @@ def MahalanobisDistance(SigMat):
     numerator = np.power(SigMat - np.repeat(MeanVec[None, :, :], N, axis=0), 2)
     denominator = np.repeat(VarVec[None, :, :], N, axis=0)
 
-    assert denominator.min() > 0
+    # assert denominator.min() > 0
     MahMat = np.sqrt(np.divide(numerator, denominator))
     return MahMat
 
@@ -278,7 +280,7 @@ def CoefVar(SigMat):
             MeanVec[p, f] = pd.Series(SigMat[:, p, f]).mean()
             VarVec[p, f] = pd.Series(SigMat[:, p, f]).var()
 
-    assert np.power(MeanVec, 2).min() > 0
+    # assert np.power(MeanVec, 2).min() > 0
     CvVec = np.sqrt(np.divide(VarVec, np.power(MeanVec, 2)))
     return CvVec, MeanVec, VarVec
 
@@ -293,7 +295,7 @@ def CoefVarOfSetPoints(SigMat):
         MeansOfMeansVec[f] = pd.Series(MeanVec[:, f]).mean()
         VarOfMeansVec[f] = pd.Series(MeanVec[:, f]).var()
 
-    assert np.power(MeansOfMeansVec, 2).min() > 0
+    # assert np.power(MeansOfMeansVec, 2).min() > 0
     CvOfSetPoints = np.sqrt(np.divide(VarOfMeansVec, np.power(MeansOfMeansVec, 2)))
     return CvOfSetPoints, MeanVec, MeansOfMeansVec
 
@@ -308,7 +310,7 @@ def NormalizedVariacne(SigMat):
         VarOfMeansVec[f] = pd.Series(MeanVec[:, f]).var()
         TotalVar[f] = pd.Series(SigMat.reshape(-1, F)[:, f]).var()
 
-    assert TotalVar.min() > 0
+    # assert TotalVar.min() > 0
     NvVec = np.divide(VarOfMeansVec, TotalVar)
     return NvVec
 
@@ -320,7 +322,8 @@ def CalcCDF(SigMat):
     for p in range(P):
         for f in range(F):
             singlePatientSingleFeature = SigMat[:, p, f]
-            n, bins, _ = plt.hist(singlePatientSingleFeature, n_bins, histtype='step', density=True, cumulative=True, label='hist')
+            notNanIndexes = np.logical_not(np.isnan(singlePatientSingleFeature))
+            n, bins, _ = plt.hist(singlePatientSingleFeature[notNanIndexes], n_bins, histtype='step', density=True, cumulative=True, label='hist')
             plt.close()  # eliminates the matplotlib plot
             CdfMat[:, p, f], binsMat[p, f, :] = n, bins[:-1]
     return binsMat, CdfMat
@@ -348,7 +351,6 @@ def cdfPlot(SigMat, featuresShareUnits, matrixName, populationName, patientId, b
     else:  # plot each cdf curve in a new figure
         p = 0  # due to union of all patients
         for f in range(F):
-            plt.figure()
             title = matrixName + "_" + populationName + "_" + patientId + "_" + batchId + "_CDF_" + SigMatFeatureNames[f]
             myPlot(binsMat[p, f, :], CdfMat[:, p, f], label=SigMatFeatureNames[f], title=title, xlabel=SigMatFeatureUnits[f])
             if enableSave:

@@ -35,6 +35,7 @@ for f, fileName in enumerate(simFileNames):
             Pas_set, O2_set, H_set = workLevel.referenceValues["x_L"][0].numpy(), workLevel.referenceValues["x_L"][3].numpy(), workLevel.referenceValues["u_L"].numpy()
             Pas_k, O2_k = x_k[:, :, 0:1], x_k[:, :, 3:4]
             c_k = np.power(q_as, 2)*np.power(Pas_k - Pas_set, 2) + np.power(q_o2, 2)*np.power(O2_k - O2_set, 2) + np.power(q_H, 2)*np.power(u_k - H_set, 2)
+            Q_k = np.power(q_as, 2)*np.power(Pas_k - Pas_set, 2) + np.power(q_o2, 2)*np.power(O2_k - O2_set, 2)
 
             tilde_q_as, tilde_q_o2, tilde_q_H = q_as/Pas_set[0], q_o2/O2_set[0], q_H/H_set[0, 0]
             relativeDenominator = np.power(tilde_q_as, 2) + np.power(tilde_q_o2, 2) + np.power(tilde_q_H, 2)
@@ -44,14 +45,14 @@ for f, fileName in enumerate(simFileNames):
                 patientId = patientId + 1
                 patientIdVec = patientId*np.ones_like(tVec)
 
-                SigMatDataArraySingleBatch = np.concatenate((dnew[:, b], x_k[:, b, :], u_k[:, b], c_k[:, b]), axis=1)[:, None, :]
+                SigMatDataArraySingleBatch = np.concatenate((dnew[:, b], x_k[:, b, :], u_k[:, b], c_k[:, b], Q_k[:, b]), axis=1)[:, None, :]
                 MetaDataDataArraySingleBatch = np.array([q_as, q_o2, q_H, relative_q_as, relative_q_o2, relative_q_H])[None, :]
 
-                patientDataArraySingleBatch_originalFields = np.concatenate((patientIdVec[:, None], tVec[:, None], dnew[:, b], x_k[:, b, :], u_k[:, b], c_k[:, b]), axis=1)
-                # ID, time, workload, Pas, Pvs, Pap, O2, HR, C
+                patientDataArraySingleBatch_originalFields = np.concatenate((patientIdVec[:, None], tVec[:, None], dnew[:, b], x_k[:, b, :], u_k[:, b], c_k[:, b], Q_k[:, b]), axis=1)
+                # ID, time, workload, Pas, Pvs, Pap, O2, HR, C, Q
 
-                patientDataArraySingleBatch_AseelsFields = np.concatenate((tVec[:, None], u_k[:, b], u_k[:, b], x_k[:, b, 1:2], x_k[:, b, 0:1], x_k[:, b, 2:3], dnew[:, b], patientIdVec[:, None], c_k[:, b], x_k[:, b, 3:4]), axis=1)
-                # 'Time', 'HR_electrical' <= HR, 'HR_mechanical' <= HR, 'DBP' <= Pvs, 'MBP' <= Pas, 'SBP' <= Pap, 'RR' <= workload, 'ID', 'PP' <= Combination, 'CO' <= O2
+                patientDataArraySingleBatch_AseelsFields = np.concatenate((tVec[:, None], u_k[:, b], Q_k[:, b], x_k[:, b, 1:2], x_k[:, b, 0:1], x_k[:, b, 2:3], dnew[:, b], patientIdVec[:, None], c_k[:, b], x_k[:, b, 3:4]), axis=1)
+                # 'Time', 'HR_electrical' <= HR, 'HR_mechanical' <= Q_k, 'DBP' <= Pvs, 'MBP' <= Pas, 'SBP' <= Pap, 'RR' <= workload, 'ID', 'PP' <= Combination, 'CO' <= O2
 
                 # downsample to fs = 1:
                 SigMatDataArraySingleBatch = SigMatDataArraySingleBatch[::fs]
@@ -84,14 +85,14 @@ for f, fileName in enumerate(simFileNames):
                     SigMatHighDataArray = np.concatenate((SigMatHighDataArray, SigMatDataArray), axis=1)
                     MetaDataHighDataArray = np.concatenate((MetaDataHighDataArray, MetaDataDataArray), axis=0)
 
-    dfLow_originalFields = pd.DataFrame(data=patientsLowDataArray_originalFields, columns=['ID', 'Time', 'Workload', 'Pas', 'Pvs', 'Pap', 'O2', 'HR', 'C'])
-    dfHigh_originalFields = pd.DataFrame(data=patientsHighDataArray_originalFields, columns=['ID', 'Time', 'Workload', 'Pas', 'Pvs', 'Pap', 'O2', 'HR', 'C'])
+    dfLow_originalFields = pd.DataFrame(data=patientsLowDataArray_originalFields, columns=['ID', 'Time', 'Workload', 'Pas', 'Pvs', 'Pap', 'O2', 'HR', 'C', 'Q'])
+    dfHigh_originalFields = pd.DataFrame(data=patientsHighDataArray_originalFields, columns=['ID', 'Time', 'Workload', 'Pas', 'Pvs', 'Pap', 'O2', 'HR', 'C', 'Q'])
 
     dfLow_AseelsFields = pd.DataFrame(data=patientsLowDataArray_AseelsFields, columns=['Time', 'HR_electrical', 'HR_mechanical', 'DBP', 'MBP', 'SBP', 'RR', 'ID', 'PP', 'CO'])
     dfHigh_AseelsFields = pd.DataFrame(data=patientsHighDataArray_AseelsFields, columns=['Time', 'HR_electrical', 'HR_mechanical', 'DBP', 'MBP', 'SBP', 'RR', 'ID', 'PP', 'CO'])
 
-    SigMatFeatureNames = ['workload','Pas','Pvs','Pap','O2v','HR','c_k']
-    SigMatFeatureUnits = ['watt','mmHg','mmHg','mmHg','L O2 / L blood','beats@sec','']
+    SigMatFeatureNames = ['workload', 'Pas', 'Pvs', 'Pap', 'O2v', 'HR', 'c_k', 'Q_k']
+    SigMatFeatureUnits = ['watt', 'mmHg', 'mmHg', 'mmHg', 'L O2 / L blood', 'beats@sec', '', '']
     MetaDataFeatureNames = ['q_as', 'q_o2', 'q_H', 'rel_q_as', 'rel_q_o2', 'rel_q_H']
     SigMatdataTuple = ([SigMatLowDataArray, MetaDataLowDataArray, SigMatFeatureNames, SigMatFeatureUnits, MetaDataFeatureNames], [SigMatHighDataArray, MetaDataHighDataArray, SigMatFeatureNames, SigMatFeatureUnits, MetaDataFeatureNames])
     pickle.dump(SigMatdataTuple, open('ndarrays_' + fileName, "wb"))
