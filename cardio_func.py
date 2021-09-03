@@ -60,9 +60,11 @@ class DoyleSDE(torch.nn.Module):
         # SNR = sigEnergy / var(noise)
         # var(noise) = sigEnergy / SNR
         # std(noise) = |sigAmp| / sqrt(SNR)
-        self.SNR = 52.04 # db
+        self.SNR = 52.04 + 30*(np.random.rand()-0.5)  # db
         self.SNR_lin = np.power(10, self.SNR/10)
         self.noiseStd = torch.abs(self.referenceValues["x_L"][:, 0]) / np.sqrt(self.SNR_lin)
+        # run times: SNR=inf - 70 sec for 10 min of single patient
+        # SNR=52db - 360 sec 70 sec for 10 min of single patient
 
     def controller_unitLessParams_to_unitParams(self, tilde_q_as, tilde_q_o2, tilde_q_H, x_L, u_L):
         return tilde_q_as*x_L[0], tilde_q_o2*x_L[3], tilde_q_H*u_L
@@ -519,7 +521,7 @@ class DoyleSDE(torch.nn.Module):
 def generate_workload_profile(batch_size, simDuration, workRef, enableInputWorkload):
     dfs = 100  # [hz]
     cutoffFreq = 1/(150 + 100*np.random.rand())  # hz
-    workStd = 250 + 100*np.random.rand()
+    workStd = 500*np.random.rand()  #250 + 100*np.random.rand()
     firtaps = firwin(numtaps=1000, cutoff=cutoffFreq, fs=dfs)
     d_tVec = torch.tensor(np.arange(0, np.ceil(simDuration * dfs)) / dfs)
     d = list()  #np.zeros((d_tVec.shape[0], batch_size, 1))
@@ -538,6 +540,15 @@ def generate_workload_profile(batch_size, simDuration, workRef, enableInputWorkl
     plt.show()
     '''
     return d, d_tVec
+
+def runsolveIvpRun(DoylePatient, x_0, d, d_tVec, simDuration):
+    DoylePatient.d, DoylePatient.d_tVec = d, d_tVec
+    DoylePatient.solveIvpRun = True
+    fs = DoylePatient.paramsDict["displayParamsDict"]["fs"]
+    nSamples = np.ceil(simDuration * fs)
+    #tVec = torch.tensor(np.arange(0, nSamples) / fs, dtype=torch.float)
+    DoylePatient.x_k_sde = DoylePatient.runSolveIvp(x_0, d, d_tVec, simDuration)
+    return DoylePatient.x_k_sde
 
 def runSdeint(DoylePatient, x_0, d, d_tVec, simDuration):
     sys.setrecursionlimit(10000)  # this is to enable a long simulation in torchsde

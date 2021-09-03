@@ -5,26 +5,28 @@ import torchsde
 import sys
 import scipy
 import pickle
+import datetime
 import black_box as bb
 from cardio_func import *
 
 # simulation parameters:
 simDuration = 60*10  # sec
-batch_size = 2
+batch_size = 1
 enableInputWorkload = True
 
 # create a dataset of patients, each patient has a low and high workload profile and a trajectory at each profile:
-fileName = 'DoylePatientsDataset_noNoise_noControl.pt'
+fileName = 'DoylePatientsHugeDataset_noNoise.pt'
 enableSaveFile = True
-nPatients = 20
+nPatients = 10000
 
 disableNoise = True
-disableController = True
+disableController = False
 
 DoylePatients = list()
 
 for p in range(nPatients):
     print(f'starting creating patient {p+1} out of {nPatients}')
+    print(datetime.datetime.now())
     # creating two profiles of the same patient, one for each workload:
     DoylePatient = createRandomPatient()
 
@@ -59,8 +61,14 @@ for p in range(nPatients):
         DoylePatient[0].to(device)
         DoylePatient[1].to(device)
 
-        runSdeint(DoylePatient[0], x_0[0].to(device), d[0].to(device), d_tVec.to(device), simDuration)
-        runSdeint(DoylePatient[1], x_0[1].to(device), d[1].to(device), d_tVec.to(device), simDuration)
+        if disableNoise:
+            runsolveIvpRun(DoylePatient[0], x_0[0].to(device), d[0].to(device), d_tVec.to(device), simDuration)
+            runsolveIvpRun(DoylePatient[1], x_0[1].to(device), d[1].to(device), d_tVec.to(device), simDuration)
+        else:
+            runSdeint(DoylePatient[0], x_0[0].to(device), d[0].to(device), d_tVec.to(device), simDuration)
+            runSdeint(DoylePatient[1], x_0[1].to(device), d[1].to(device), d_tVec.to(device), simDuration)
+
+
 
     DoylePatients.append(DoylePatient)
 if enableSaveFile:
