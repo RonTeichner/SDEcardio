@@ -5,8 +5,7 @@ import numpy as np
 from scipy import interpolate
 from cardio_func import *
 
-#simFileNames = ["DoylePatientsDataset.pt", "DoylePatientsDataset_noNoise.pt", "DoylePatientsDataset_noNoise_noControl.pt"]
-simFileNames = ["DoylePatientsHugeDataset_noNoise.pt", "DoylePatientsHugeDataset_noNoise_noControl.pt"]
+simFileNames = ["DoylePatientsHugeDataset_noNoise", "DoylePatientsHugeDataset_noNoise_noControl", "DoylePatientsHugeDataset.pt", "DoylePatientsHugeDataset_noControl.pt"]
 
 patientId = 0
 for f, fileName in enumerate(simFileNames):

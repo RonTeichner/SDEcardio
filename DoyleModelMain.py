@@ -15,12 +15,13 @@ batch_size = 1
 enableInputWorkload = True
 
 # create a dataset of patients, each patient has a low and high workload profile and a trajectory at each profile:
-fileName = 'DoylePatientsHugeDataset_noNoise.pt'
+fileName = 'DoylePatientsHugeDataset.pt'
 enableSaveFile = True
-nPatients = 10000
+nPatients = 100
 
-disableNoise = True
+disableNoise = False
 disableController = False
+disableWorkloadVar = True
 
 DoylePatients = list()
 
@@ -48,7 +49,7 @@ for p in range(nPatients):
     workRef = list()
     workRef.append(DoylePatient[0].referenceValues["d_L"][None, :, :].repeat(batch_size, 1, 1))
     workRef.append(DoylePatient[1].referenceValues["d_L"][None, :, :].repeat(batch_size, 1, 1))
-    d, d_tVec = generate_workload_profile(batch_size, simDuration, workRef, enableInputWorkload)
+    d, d_tVec = generate_workload_profile(batch_size, simDuration, workRef, enableInputWorkload, disableWorkloadVar)
 
     # Initial state x0, the SDE is solved over the interval [tVec[0], tVec[-1]].
     # x_k will have shape (tVec.shape[0], batch_size, state_size)

@@ -21,6 +21,22 @@ def R_L(cj, cm, L):
 
     return dotProduct/(effectiveNorm_cm*effectiveNorm_cj)
 
+def N_C(cj, cm, L):
+    N = cj.shape[0]
+
+    i0 = np.max((L, 0))
+    i1 = N - 1 + np.min((0, L))
+
+    cj, cm = cj[i0:i1+1], cm[i0-L:i1+1-L]
+
+    cj_ValidIndexes, cm_ValidIndexes = np.logical_not(np.isnan(cj)), np.logical_not(np.isnan(cm))
+    validIndexes = np.logical_and(cj_ValidIndexes, cm_ValidIndexes)
+
+    effectiveNorm_cj, effectiveNorm_cm = np.sqrt(np.power(cj[validIndexes], 2).sum()), np.sqrt(np.power(cm[validIndexes], 2).sum())
+    dotProduct = np.dot(cj[validIndexes], cm[validIndexes])
+
+    return dotProduct/(effectiveNorm_cm*effectiveNorm_cj)
+
 x = np.array([0.25, 0.5, np.nan, -0.05])
 
 s = pd.Series(x)
@@ -33,15 +49,20 @@ nanIndexes = [10,20,30,40,50,60,70,80,90]
 x[nanIndexes] = np.nan
 lagValues = np.arange(-(N-2),N-1)
 #lagValues = np.array([N-1-1])
-maxDiff = 0.0
+maxDiffAutoCorr, maxDiffNormalizedCorr = 0.0, 0.0
 for lag in lagValues:
     autocorr_pd = pd.Series(x).autocorr(lag=lag)
     if np.isnan(x).any() and np.logical_not(np.isnan(autocorr_pd)):
         print('nan values in signal but autocorr res is not nan')
     autoCorr_self = R_L(x, x, lag)  # This calculates R(L,j,m) with support for nan values.
     #print(f'my autocorr with lag = {lag} is {autoCorr_self}, pd autocorr is {autocorr_pd}')
-    maxDiff = np.max((np.abs(autocorr_pd - autoCorr_self), maxDiff))
-print(f'maxDiff between pandas autocorr and self calculated: {maxDiff}')
+    maxDiffAutoCorr = np.max((np.abs(autocorr_pd - autoCorr_self), maxDiffAutoCorr))
+
+    normalizedCorr_self = N_C(x, x, lag)
+    #normalizedCorr_pd = N_C_pd(x, x, lag)
+    #maxDiffNormalizedCorr = np.max((np.abs(normalizedCorr_pd - normalizedCorr_self), maxDiffNormalizedCorr))
+print(f'maxDiff between pandas autocorr and self calculated: {maxDiffAutoCorr}')
+#print(f'maxDiff between pandas corr and self calculated: {maxDiffNormalizedCorr}')
 
 x = np.random.randn(100, 5, 3)
 x[:,:,1] = x[:,:,1]*1000
