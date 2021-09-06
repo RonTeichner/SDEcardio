@@ -107,7 +107,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
         cdfPlot(AcVecBatchPopulation[None, :, :], True, matrixName, population, 'AC', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
 
         # plot CDF, mean, std  of Nc values for population:
-        cdfPlot(NcVecBatchPopulation[None, :, :], True, matrixName, population, 'AC', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+        cdfPlot(NcVecBatchPopulation[None, :, :], True, matrixName, population, 'NC', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
 
         # plot CDF, mean, std of Cv values for population:
         cdfPlot(CvVecBatchPopulation[None, :, :], True, matrixName, population, 'Cv', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
@@ -212,7 +212,7 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
 def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
 
-    # CDF plot:
+    # CDF , mean, std plot:
     patientId = '' # all patients
     cdfPlot(SigMat, featuresShareUnits, matrixName, populationName, patientId, '', SigMatFeatureNames, SigMatFeatureUnits, figuresDirName, enableSave)
 
@@ -231,21 +231,6 @@ def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, 
     if enableSave:
         plt.savefig("./" + figuresDirName + "/" + title + ".png")
         plt.close()
-
-    # Mean
-    title = matrixName + "_" + populationName + "_Mean"
-    myBarPlot(SigMatFeatureNames, MeansOfMeansVec, title)
-    if enableSave:
-        plt.savefig("./" + figuresDirName + "/" + title + ".png")
-        plt.close()
-
-    # std
-    title = matrixName + "_" + populationName + "_Std"
-    myBarPlot(SigMatFeatureNames, np.sqrt(TotalVar), title)
-    if enableSave:
-        plt.savefig("./" + figuresDirName + "/" + title + ".png")
-        plt.close()
-
 
 
 def MahalanobisDistance(SigMat):
@@ -464,8 +449,19 @@ def myScatter(x, y, label='', title='', xlabel='', ylabel=''):
 
 
 def myBarPlot(names, values, title):
+    #stringsSum = sumStrings(names)
+    #factor = 0.1
+    #plt.figure(figsize=(factor * stringsSum * 6.4, 4.8))
     plt.bar(names, values)
     plt.title(title)
+    plt.grid()
+
+def sumStrings(names):
+    stringSum = 0
+    for name in names:
+        stringSum = stringSum + len(name)
+    return stringSum
+
 
 def R_L(cj, cm, L):
     N = cj.shape[0]
