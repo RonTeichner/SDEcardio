@@ -3,7 +3,8 @@ import pickle
 from dataAnalysis_func import *
 
 #simFileNames = ["ndarrays_DoylePatientsDataset_noNoise","ndarrays_DoylePatientsDataset_noNoise_noControl","ndarrays_DoylePatientsDataset"]
-simFileNames = ["ndarrays_DoylePatientsHugeDataset_noNoise", "ndarrays_DoylePatientsHugeDataset_noNoise_noControl", "ndarrays_DoylePatientsHugeDataset", "ndarrays_DoylePatientsHugeDataset_noControl"]
+#simFileNames = ["ndarrays_DoylePatientsHugeDataset_noNoise", "ndarrays_DoylePatientsHugeDataset_noNoise_noControl", "ndarrays_DoylePatientsHugeDataset", "ndarrays_DoylePatientsHugeDataset_noControl"]
+simFileNames = ["ndarrays_WrongModelDoylePatientsDataset_noNoiseNoControl", "ndarrays_WrongModelDoylePatientsDataset_noNoise"]
 
 fs = 1
 slidingWindowSize = int(60*fs)

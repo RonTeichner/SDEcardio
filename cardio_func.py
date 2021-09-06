@@ -521,7 +521,7 @@ class DoyleSDE(torch.nn.Module):
 def generate_workload_profile(batch_size, simDuration, workRef, enableInputWorkload, disableWorkloadVar):
     dfs = 100  # [hz]
     cutoffFreq = 1/(150 + 100*np.random.rand())  # hz
-    workStd = 500*np.random.rand()  #250 + 100*np.random.rand()
+    workStd = 100*np.random.rand()  #250 + 100*np.random.rand()
     if disableWorkloadVar: workStd = 0
     firtaps = firwin(numtaps=1000, cutoff=cutoffFreq, fs=dfs)
     d_tVec = torch.tensor(np.arange(0, np.ceil(simDuration * dfs)) / dfs)
