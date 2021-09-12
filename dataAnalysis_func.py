@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
 def dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, enableSave=True):
@@ -428,6 +429,30 @@ def cdfPlot(SigMat, featuresShareUnits, matrixName, populationName, patientId, b
             if enableSave:
                 plt.savefig("./" + figuresDirName + "/" + title + ".png")
                 plt.close()
+
+def ArPrediction(x, p):
+    X = np.zeros((len(x) - p, p))
+    y = x[p:]
+    for r in range(p):
+        X[:, r] = x[r:r + X.shape[0]]
+    # remove nans:
+    y_validIndexes = np.logical_not(np.isnan(y))
+    X_validRows = np.logical_not(np.isnan(X)).all(axis=1)
+    validRows = np.logical_and(y_validIndexes, X_validRows)
+
+    X_noNans, y_noNans = X[validRows], y[validRows]
+
+    reg = LinearRegression().fit(X_noNans, y_noNans)
+    predictionLevel = reg.score(X_noNans, y_noNans)
+    coefs = reg.coef_[None, :]
+    intercept = reg.intercept_
+
+    predictions_noNans = reg.predict(X[X_validRows])
+    predictions = np.full(len(y), np.nan)
+    predictions[X_validRows] = predictions_noNans
+    predictions = np.concatenate((np.full(p, np.nan), predictions))
+
+    return predictions, predictionLevel, intercept, coefs
 
 def myPlot(x, y, label='', title='', xlabel='', ylabel=''):
     plt.plot(x, y, label=label)
