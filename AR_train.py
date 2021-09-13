@@ -21,6 +21,9 @@ data = np.array([4, 7, 2, 10, 21, 26, 11, 29, 83, 22, 92, 46, 119, 73, 97, 149,
                     2107, 2174, 2411, 2551, 2582, 3144, 3103, 2476, 2462, 2905], dtype=float)
 
 # fit model
+indexes = np.random.randint(0, data.shape[0]-49, 3)
+data[indexes]=np.nan
+
 lags=7
 predictions, predictionLevel, intercept, coefs = ArPrediction(data, lags)
 print(f'prediction level is {predictionLevel}')
