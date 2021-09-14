@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 
-def dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, enableSave=True):
+def dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, Arlags, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, enableSave=True):
     enableAcSw = False
 
     slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag = int(slidingWindowSize), int(slidingWindowsWingap), int(autoCorrMaxLag)
@@ -14,14 +14,14 @@ def dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat
     print('starting raw data analysis')
     rawDataFiguresDirName = figuresDirName + "/rawData"
     if not (os.path.isdir("./" + rawDataFiguresDirName)): os.makedirs("./" + rawDataFiguresDirName)
-    singleMatAnalysis("rawData", SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, rawDataFiguresDirName, autoCorrMaxLag, featuresShareUnits=False, enableSave=enableSave)
+    singleMatAnalysis("rawData", SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, rawDataFiguresDirName, autoCorrMaxLag, Arlags, featuresShareUnits=False, enableSave=enableSave)
 
     print('starting Mahalanobis analysis')
     MahMat = MahalanobisDistance(SigMat)
     mahalanobisFiguresDirName = figuresDirName + "/mahalanobis"
     if not (os.path.isdir("./" + mahalanobisFiguresDirName)): os.makedirs("./" + mahalanobisFiguresDirName)
     MahMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-    singleMatAnalysis("Mahalanobis", MahMat, SigMatFeatureNames, MahMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, mahalanobisFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
+    singleMatAnalysis("Mahalanobis", MahMat, SigMatFeatureNames, MahMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, mahalanobisFiguresDirName, autoCorrMaxLag, Arlags, featuresShareUnits=True, enableSave=enableSave)
 
     if enableAcSw:
         print('starting auto-corr analysis')
@@ -30,16 +30,16 @@ def dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat
         AcSwMatFiguresDirName = figuresDirName + "/autoCorrSw"
         if not (os.path.isdir("./" + AcSwMatFiguresDirName)): os.makedirs("./" + AcSwMatFiguresDirName)
         AcSwMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-        singleMatAnalysis("AutoCorrSw", AcSwMat, SigMatFeatureNames, AcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs_SW, patientMetaDataTextBox, AcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
+        singleMatAnalysis("AutoCorrSw", AcSwMat, SigMatFeatureNames, AcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs_SW, patientMetaDataTextBox, AcSwMatFiguresDirName, autoCorrMaxLag, Arlags, featuresShareUnits=True, enableSave=enableSave)
 
         print('starting Mahalanobis auto-corr analysis')
         MahAcSwMat = MahalanobisDistance(AcSwMat)
         MahAcSwMatFiguresDirName = figuresDirName + "/MahAutoCorrSw"
         if not (os.path.isdir("./" + MahAcSwMatFiguresDirName)): os.makedirs("./" + MahAcSwMatFiguresDirName)
         MahAcSwMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-        singleMatAnalysis("MahAutoCorrSw", MahAcSwMat, SigMatFeatureNames, MahAcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs_SW, patientMetaDataTextBox, MahAcSwMatFiguresDirName, autoCorrMaxLag, featuresShareUnits=True, enableSave=enableSave)
+        singleMatAnalysis("MahAutoCorrSw", MahAcSwMat, SigMatFeatureNames, MahAcSwMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs_SW, patientMetaDataTextBox, MahAcSwMatFiguresDirName, autoCorrMaxLag, Arlags, featuresShareUnits=True, enableSave=enableSave)
 
-def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
+def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, Arlags, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
     metaData_F = len(MetaDataFeatureNames)
 
@@ -71,7 +71,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
             if not (os.path.isdir("./" + specificPopulationSpecificPatientFigureDirName)): os.makedirs("./" + specificPopulationSpecificPatientFigureDirName)
             patientIndexes = PatientIdSinglePopulation == patient
             SigMatSinglePopulationSinglePatient = SigMatSinglePopulation[:, patientIndexes, :]
-            CvVecPopulation[p], _, _, _, _ = singlePatientAnalysis(False, matrixName, population, SigMatSinglePopulationSinglePatient, SigMatFeatureNames, SigMatFeatureUnits, patientId, '', PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
+            CvVecPopulation[p], _, _, _, _, _ = singlePatientAnalysis(False, matrixName, population, SigMatSinglePopulationSinglePatient, SigMatFeatureNames, SigMatFeatureUnits, patientId, '', PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientFigureDirName, autoCorrMaxLag, Arlags, featuresShareUnits, enableSave)
 
         # plot CDF of Cv values for population:
         cdfPlot(CvVecPopulation[None, :, :], featuresShareUnits, matrixName, population, 'CV', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
@@ -84,7 +84,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
         MetaDataSinglePopulation = MetaData[populationIndexes, :]
         PatientIdSinglePopulation = np.array(PatientIds)[populationIndexes]
         patients = np.unique(PatientIdSinglePopulation)
-        AcVecBatchPopulation, NcVecBatchPopulation, MeanVecBatchPopulation, VarVecBatchPopulation, CvVecBatchPopulation = np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F))
+        AcVecBatchPopulation, NcVecBatchPopulation, ArVecBatchPopulation, MeanVecBatchPopulation, VarVecBatchPopulation, CvVecBatchPopulation = np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F)), np.zeros((SigMatSinglePopulation.shape[1], F))
         MetaDataBatchPopulation = np.zeros((SigMatSinglePopulation.shape[1], metaData_F))
         AcVecIndex = -1
         for p, patient in enumerate(patients):
@@ -101,7 +101,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
                 SigMatSinglePopulationSinglePatientSingleBatch = SigMatSinglePopulationSinglePatient[:, b, :][:, None, :]
                 MetaDataSinglePopulationSinglePatientSingleBatch = MetaDataSinglePopulationSinglePatient[b, :]
                 AcVecIndex = AcVecIndex + 1
-                CvVec, MeanVec, VarVec, AcVecBatchPopulation[AcVecIndex], NcVecBatchPopulation[AcVecIndex] = singlePatientAnalysis(True, matrixName, population, SigMatSinglePopulationSinglePatientSingleBatch, SigMatFeatureNames, SigMatFeatureUnits, patientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientBatchFigureDirName, autoCorrMaxLag, featuresShareUnits, enableSave)
+                CvVec, MeanVec, VarVec, AcVecBatchPopulation[AcVecIndex], NcVecBatchPopulation[AcVecIndex], ArVecBatchPopulation[AcVecIndex] = singlePatientAnalysis(True, matrixName, population, SigMatSinglePopulationSinglePatientSingleBatch, SigMatFeatureNames, SigMatFeatureUnits, patientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, specificPopulationSpecificPatientBatchFigureDirName, autoCorrMaxLag, Arlags, featuresShareUnits, enableSave)
                 VarVecBatchPopulation[AcVecIndex], MeanVecBatchPopulation[AcVecIndex], CvVecBatchPopulation[AcVecIndex], MetaDataBatchPopulation[AcVecIndex] = VarVec[0], MeanVec[0], CvVec[0], MetaDataSinglePopulationSinglePatientSingleBatch
 
         # plot CDF, mean, std  of Ac values for population:
@@ -112,6 +112,9 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
 
         # plot CDF, mean, std of Cv values for population:
         cdfPlot(CvVecBatchPopulation[None, :, :], True, matrixName, population, 'Cv', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+
+        # plot CDF, mean, std of Ar values for population:
+        cdfPlot(ArVecBatchPopulation[None, :, :], True, matrixName, population, 'Ar', '', SigMatFeatureNames, ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
 
         # plot scatter plots per metaDatafeature for population:
         specificPopulationScatterPlotsFigureDirName = specificPopulationFigureDirName + "/" + "ScatterPlots"
@@ -142,7 +145,7 @@ def singleMatAnalysis(matrixName, SigMat, SigMatFeatureNames, SigMatFeatureUnits
                     plt.savefig("./" + specificPopulationScatterPlotsFigureDirName + "/" + title + ".png")
                     plt.close()
 
-def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
+def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, batchId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, Arlags, featuresShareUnits, enableSave):
     N, P, F = SigMat.shape
     if singleBatch: assert P == 1
 
@@ -181,7 +184,7 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
             plt.close()
 
     if singleBatch:
-        AcVec, NcVec = TotalAutoCorr(SigMat, autoCorrMaxLag), TotalNormalizedCorr(SigMat, autoCorrMaxLag)
+        AcVec, NcVec, ArVec = TotalAutoCorr(SigMat, autoCorrMaxLag), TotalNormalizedCorr(SigMat, autoCorrMaxLag), ArPredictionLevel(SigMat, Arlags)
         title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_Ac"
         myBarPlot(SigMatFeatureNames, AcVec[0], title)
         if enableSave:
@@ -190,6 +193,12 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
 
         title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_Nc"
         myBarPlot(SigMatFeatureNames, NcVec[0], title)
+        if enableSave:
+            plt.savefig("./" + figuresDirName + "/" + title + ".png")
+            plt.close()
+
+        title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_Ar"
+        myBarPlot(SigMatFeatureNames, ArVec[0], title)
         if enableSave:
             plt.savefig("./" + figuresDirName + "/" + title + ".png")
             plt.close()
@@ -205,9 +214,9 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, SigMat, SigMa
                 plt.close()
 
     else:
-        AcVec, NcVec = np.nan, np.nan
+        AcVec, NcVec, ArVec = np.nan, np.nan, np.nan
 
-    return CvVec, MeanVec, VarVec, AcVec, NcVec
+    return CvVec, MeanVec, VarVec, AcVec, NcVec, ArVec
 
 
 def allPatientsAnalysis(matrixName, populationName, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientId, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName, autoCorrMaxLag, featuresShareUnits, enableSave):
@@ -248,6 +257,16 @@ def MahalanobisDistance(SigMat):
     # assert denominator.min() > 0
     MahMat = np.sqrt(np.divide(numerator, denominator))
     return MahMat
+
+
+def ArPredictionLevel(SigMat, lags):
+    N, P, F = SigMat.shape
+    ArVec = np.zeros((P, F))
+
+    for p in range(P):
+        for f in range(F):
+            ArVec[p, f] = ArPrediction(SigMat[:, p, f], lags)[1]
+    return ArVec
 
 def TotalAutoCorr(SigMat, autoCorrMaxLag):
     N, P, F = SigMat.shape
@@ -441,16 +460,19 @@ def ArPrediction(x, p):
     validRows = np.logical_and(y_validIndexes, X_validRows)
 
     X_noNans, y_noNans = X[validRows], y[validRows]
+    
+    if validRows.any():
+        reg = LinearRegression().fit(X_noNans, y_noNans)
+        predictionLevel = reg.score(X_noNans, y_noNans)
+        coefs = reg.coef_[None, :]
+        intercept = reg.intercept_
 
-    reg = LinearRegression().fit(X_noNans, y_noNans)
-    predictionLevel = reg.score(X_noNans, y_noNans)
-    coefs = reg.coef_[None, :]
-    intercept = reg.intercept_
-
-    predictions_noNans = reg.predict(X[X_validRows])
-    predictions = np.full(len(y), np.nan)
-    predictions[X_validRows] = predictions_noNans
-    predictions = np.concatenate((np.full(p, np.nan), predictions))
+        predictions_noNans = reg.predict(X[X_validRows])
+        predictions = np.full(len(y), np.nan)
+        predictions[X_validRows] = predictions_noNans
+        predictions = np.concatenate((np.full(p, np.nan), predictions))
+    else:
+        predictions, predictionLevel, intercept, coefs = np.full(len(y), np.nan), 0, np.nan, np.full(p, np.nan)
 
     return predictions, predictionLevel, intercept, coefs
 
