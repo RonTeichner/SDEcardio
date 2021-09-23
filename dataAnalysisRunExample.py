@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from dataAnalysis_func import *
 
 #np.random.seed(seed=2589629)
@@ -14,9 +15,10 @@ SigMat = np.random.randn(nTimePoints, nTotalPatientsBatches, nFeatures)
 for f in range(SigMat.shape[2]):
     SigMat[:, :, f] = np.power(10, f) * SigMat[:, :, f]
 
-for p in range(SigMat.shape[1]):
-    nanIndexesTime = np.random.randint(0, nTimePoints, 5)
-    #SigMat[nanIndexesTime] = np.nan
+for p in range(nPatients):
+    for f in range(nFeatures):
+        nanIndexesTime = np.random.randint(0, nTimePoints, 3)
+        SigMat[nanIndexesTime, p, f] = np.nan
 
 assert np.logical_not(np.isnan(SigMat)).any()
 
@@ -40,9 +42,16 @@ fs = 2  # hz
 
 patientMetaDataTextBox = ["age", "weight"]
 slidingWindowSize = 11 # window size of autocorr
-autoCorrMaxLag = 5
+autoCorrMaxLag = 5  # [sec]
 slidingWindowsWingap = int(slidingWindowSize/2)
 figuresDirName = "exampleDataAnalysis"
 #np.seterr(all='raise')
-dataAnalysis(slidingWindowSize, slidingWindowsWingap, autoCorrMaxLag, SigMat, SigMatFeatureNames, SigMatFeatureUnits, PatientIds, PatientClassification, MetaData, MetaDataFeatureNames, fs, patientMetaDataTextBox, figuresDirName)
+Arlags = 5
+
+paramsDict = {"fs": fs, "slidingWindowSize": slidingWindowSize, "slidingWindowsWingap": slidingWindowsWingap, "autoCorrMaxLag": autoCorrMaxLag, "Arlags": Arlags}
+
+patientsDf = SigMat2Df(SigMat, fs, SigMatFeatureNames, PatientIds, nBatchesPerPatient)
+metaDataDf = MetaData2Df(MetaData, MetaDataFeatureNames, PatientClassification, PatientIds)
+
+dataAnalysis(paramsDict, patientsDf, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, figuresDirName)
 plt.close()
