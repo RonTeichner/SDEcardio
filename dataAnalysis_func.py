@@ -51,16 +51,17 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
     # analysis on all patients:
     allPatientsFigureDirName = figuresDirName + "/allPatientsUnion"
     if not (os.path.isdir("./" + allPatientsFigureDirName)): os.makedirs("./" + allPatientsFigureDirName)
-    allPatientsAnalysis(matrixName, 'all', paramsDict, patientsDf, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, allPatientsFigureDirName, featuresShareUnits, enableSave)
+    _, _ = allPatientsAnalysis(matrixName, 'all', paramsDict, patientsDf, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, allPatientsFigureDirName, featuresShareUnits, enableSave)
 
     # analysis per population:
     populations = metaDataDf["classification"].unique().tolist()
+    NvVecPopulation, CvOfSetPointsPopulation = [dict()]*2
     for population in populations:
         specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         if not (os.path.isdir("./" + specificPopulationFigureDirName)): os.makedirs("./" + specificPopulationFigureDirName)
         patients = metaDataDf[metaDataDf["classification"] == population][["Id"]].values[:, 0]
         patientsDfSinglePopulation = patientsDf[patientsDf["Id"].isin(patients)]
-        allPatientsAnalysis(matrixName, population, paramsDict, patientsDfSinglePopulation, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, specificPopulationFigureDirName, featuresShareUnits, enableSave)
+        NvVecPopulation[population], CvOfSetPointsPopulation[population] = allPatientsAnalysis(matrixName, population, paramsDict, patientsDfSinglePopulation, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, specificPopulationFigureDirName, featuresShareUnits, enableSave)
 
     # analysis per patient:
     for population in populations:
@@ -114,6 +115,20 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
 
         # plot CDF, mean, std of Ar values for population:
         cdfPlot(ArVecBatchPopulationDf, True, matrixName, population, 'Ar', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+
+        # 2dplot CvOfSetPoints vs means(Cv):
+        title = matrixName + "_" + population + "_" + "_CvOfSetPoints_vs_means(Cv)"
+        my2dPlot(CvVecBatchPopulationDf.mean(axis=0), CvOfSetPointsPopulation[population], title=title, enableDiagonal=True)
+        if enableSave:
+            plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+            plt.close()
+
+        # 2dplot NormalizedVariance vs means(Cv):
+        title = matrixName + "_" + population + "_" + "_Nv_vs_means(Cv)"
+        my2dPlot(CvVecBatchPopulationDf.mean(axis=0), NvVecPopulation[population], title=title)
+        if enableSave:
+            plt.savefig("./" + specificPopulationFigureDirName + "/" + title + ".png")
+            plt.close()
 
         # plot scatter plots per metaDatafeature for population:
         specificPopulationScatterPlotsFigureDirName = specificPopulationFigureDirName + "/" + "ScatterPlots"
@@ -247,6 +262,8 @@ def allPatientsAnalysis(matrixName, populationName, paramsDict, patientsDf, meta
     if enableSave:
         plt.savefig("./" + figuresDirName + "/" + title + ".png")
         plt.close()
+
+    return NvVec, CvOfSetPoints
 
 
 def MahalanobisDistance(paramsDict, patientsDf):
@@ -617,6 +634,23 @@ def myBarPlot(values, title):
     plt.title(title)
     plt.grid()
 
+def my2dPlot(x, y, title, enableDiagonal=False):
+    features = x.index.to_list()
+    fig, axs = plt.subplots(1, 2)
+    fig.suptitle(title)
+    scales = ['linear', 'log']
+    for i, scale in enumerate(scales):
+        #plt.subplot(1, len(scales), i+1)
+        if enableDiagonal:
+            axs[i].plot(np.array([x.min(), x.max()]), np.array([x.min(), x.max()]), '--', label='diagonal')
+        for feature in features:
+            axs[i].plot(x[feature], y[feature], '+', label=feature)
+        if i==0: axs[i].legend()
+        #axs[i].set_title(scale)
+        axs[i].grid()
+        axs[i].set_xscale(scale)
+        axs[i].set_yscale(scale)
+
 def sumStrings(names):
     stringSum = 0
     for name in names:
@@ -651,7 +685,7 @@ def SigMat2Df(SigMat, fs, SigMatFeatureNames, PatientIds, nBatchesPerPatient):
     patientsDf["Id"] = [val for val in PatientIds for _ in range(N)]
     batchList = list()
     for p in range(len(nBatchesPerPatient)):
-        for b in range(nBatchesPerPatient[p]):
+        for b in range(int(nBatchesPerPatient[p])):
             batchList = batchList + [b]*N
 
     patientsDf["batch"] = batchList

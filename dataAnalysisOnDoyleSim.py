@@ -2,8 +2,8 @@ import numpy as np
 import pickle
 from dataAnalysis_func import *
 
-#simFileNames = ["ndarrays_DoylePatientsDataset_noNoise","ndarrays_DoylePatientsDataset_noNoise_noControl","ndarrays_DoylePatientsDataset"]
-simFileNames = ["ndarrays_DoylePatientsHugeDataset", "ndarrays_DoylePatientsHugeDataset_noControl", "ndarrays_DoylePatientsHugeDataset_noNoise", "ndarrays_DoylePatientsHugeDataset_noNoise_noControl"]
+simFileNames = ["ndarrays_DoylePatientsDataset_noNoise","ndarrays_DoylePatientsDataset_noNoise_noControl","ndarrays_DoylePatientsDataset"]
+#simFileNames = ["ndarrays_DoylePatientsHugeDataset", "ndarrays_DoylePatientsHugeDataset_noControl", "ndarrays_DoylePatientsHugeDataset_noNoise", "ndarrays_DoylePatientsHugeDataset_noNoise_noControl"]
 
 fs = 1
 slidingWindowSize = 60
