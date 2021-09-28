@@ -630,9 +630,16 @@ def myBarPlot(values, title):
     #stringsSum = sumStrings(names)
     #factor = 0.1
     #plt.figure(figsize=(factor * stringsSum * 6.4, 4.8))
-    plt.bar(values.index, values.values)
-    plt.title(title)
-    plt.grid()
+
+    fig, axs = plt.subplots(1, 2)
+    fig.set_size_inches(16, 8)
+    fig.suptitle(title)
+    scales = ['linear', 'log']
+    for i, scale in enumerate(scales):
+        axs[i].bar(values.index, values.values)
+        #axs[i].set_title(scale)
+        axs[i].grid()
+        axs[i].set_yscale(scale)
 
 def my2dPlot(x, y, title, enableDiagonal=False):
     features = x.index.to_list()
