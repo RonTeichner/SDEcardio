@@ -238,6 +238,15 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, paramsDict, p
                 plt.savefig("./" + figuresDirName + "/" + title + ".png")
                 plt.close()
 
+        # plot mean-normalized trajectories:
+        title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_" + "mean_normalized_trajectories"
+        for f, feature in enumerate(features):
+            values = patientsDf[feature].values / patientsDf[feature].values.mean()
+            myPlot(patientsDf["time"].values, values, label=feature, title=title, xlabel='sec', ylabel=SigMatFeatureUnits[f])
+        if enableSave:
+            plt.savefig("./" + figuresDirName + "/" + title + ".png")
+            plt.close()
+
     return CvVec, MeanVec, VarVec, AcVec, NcVec, ArVec
 
 
