@@ -12,7 +12,7 @@ if np.mod(slidingWindowSize, 2) == 0:
 autoCorrMaxLag = 30  # sec
 slidingWindowsWingap = 1  #int(slidingWindowSize/2)
 Arlags = 120
-paramsDict = {"fs": fs, "slidingWindowSize": slidingWindowSize, "slidingWindowsWingap": slidingWindowsWingap, "autoCorrMaxLag": autoCorrMaxLag, "Arlags": Arlags}
+paramsDict = {"fs": fs, "slidingWindowSize": slidingWindowSize, "slidingWindowsWingap": slidingWindowsWingap, "autoCorrMaxLag": autoCorrMaxLag, "Arlags": Arlags, "analysisStartTime": 100, "analysisEndTime": np.inf}
 
 for simFileName in simFileNames:
     ndarrays_DoylePatientsDataset = pickle.load(open(simFileName + '.pt', "rb"))

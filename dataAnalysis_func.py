@@ -12,6 +12,11 @@ def dataAnalysis(paramsDict, patientsDf, metaDataDf, SigMatFeatureUnits, patient
     paramsDict["nFeatures"] = len(SigMatFeatureUnits)
     paramsDict["nMetaDataFeatures"] = len(metaDataDf.columns) - 2
 
+    # insert nans out of analysis times:
+    features = patientsDf.columns.to_list()[-paramsDict["nFeatures"]:]
+    patientsDf.loc[patientsDf["time"] < paramsDict["analysisStartTime"], features] = np.nan
+    patientsDf.loc[patientsDf["time"] > paramsDict["analysisEndTime"], features] = np.nan
+
     if not(os.path.isdir("./" + figuresDirName)): os.makedirs("./" + figuresDirName)
 
     print('starting raw data analysis')
@@ -241,7 +246,7 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, paramsDict, p
         # plot mean-normalized trajectories:
         title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_" + "mean_normalized_trajectories"
         for f, feature in enumerate(features):
-            values = patientsDf[feature].values / patientsDf[feature].values.mean()
+            values = patientsDf[feature].values / patientsDf[feature].mean()
             myPlot(patientsDf["time"].values, values, label=feature, title=title, xlabel='sec', ylabel=SigMatFeatureUnits[f])
         if enableSave:
             plt.savefig("./" + figuresDirName + "/" + title + ".png")
@@ -293,8 +298,8 @@ def MahalanobisDistance(paramsDict, patientsDf):
             numerator = np.power(singleBatch[features] - MeanVec[b], 2)
             denominator = VarVec[b]
 
+            singleBatch[features] = np.sqrt(np.divide(numerator, denominator))
             patientsMahDf = patientsMahDf.append(singleBatch)
-            patientsMahDf[features] = np.sqrt(np.divide(numerator, denominator))
 
     return patientsMahDf
 
@@ -341,7 +346,8 @@ def seriesResample(patientDf):
     nSamplesNew = int(np.floor(duration/mostPopularTs + 1))
     tVecNew = tVec[0] + mostPopularTs * np.arange(0, nSamplesNew)
     tVecNew = tVecNew + (np.mod(tVecNew[0], mostPopularTs) - mostPopularPhase)
-
+    tVecNew = tVecNew[np.logical_and(tVecNew >= tVec.min(), tVecNew <= tVec.max())]
+    
     f = interpolate.interp1d(tVec, data)
     dataResampled = f(tVecNew)  # use interpolation function returned by `interp1d`
 

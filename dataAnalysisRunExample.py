@@ -48,7 +48,7 @@ figuresDirName = "exampleDataAnalysis"
 #np.seterr(all='raise')
 Arlags = 5
 
-paramsDict = {"fs": fs, "slidingWindowSize": slidingWindowSize, "slidingWindowsWingap": slidingWindowsWingap, "autoCorrMaxLag": autoCorrMaxLag, "Arlags": Arlags}
+paramsDict = {"fs": fs, "slidingWindowSize": slidingWindowSize, "slidingWindowsWingap": slidingWindowsWingap, "autoCorrMaxLag": autoCorrMaxLag, "Arlags": Arlags, "analysisStartTime": -np.inf, "analysisEndTime": np.inf}
 
 patientsDf = SigMat2Df(SigMat, fs, SigMatFeatureNames, PatientIds, nBatchesPerPatient)
 metaDataDf = MetaData2Df(MetaData, MetaDataFeatureNames, PatientClassification, PatientIds)
