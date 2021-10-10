@@ -60,7 +60,7 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
 
     # analysis per population:
     populations = metaDataDf["classification"].unique().tolist()
-    NvVecPopulation, CvOfSetPointsPopulation = [dict()]*2
+    NvVecPopulation, CvOfSetPointsPopulation = dict(), dict()
     for population in populations:
         specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         if not (os.path.isdir("./" + specificPopulationFigureDirName)): os.makedirs("./" + specificPopulationFigureDirName)
@@ -92,7 +92,8 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
         metaDataSinglePopulationDf = metaDataDf[metaDataDf["classification"] == population]
         patients = metaDataSinglePopulationDf[["Id"]].to_numpy(dtype='float32')[:, 0]
         patientsDfSinglePopulation = patientsDf[patientsDf["Id"].isin(patients)]
-        AcVecBatchPopulationDf, NcVecBatchPopulationDf, ArVecBatchPopulationDf, MeanVecBatchPopulationDf, VarVecBatchPopulationDf, CvVecBatchPopulationDf = [pd.DataFrame(columns=features)]*6
+        AcVecBatchPopulationDf, NcVecBatchPopulationDf, ArVecBatchPopulationDf, MeanVecBatchPopulationDf, VarVecBatchPopulationDf, CvVecBatchPopulationDf \
+            = pd.DataFrame(columns=features), pd.DataFrame(columns=features), pd.DataFrame(columns=features), pd.DataFrame(columns=features), pd.DataFrame(columns=features), pd.DataFrame(columns=features)
         MetaDataBatchPopulationDf = pd.DataFrame(columns=metaDataDf.columns)
         #AcVecIndex = -1
         for p, patient in enumerate(patients):
@@ -213,7 +214,7 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, paramsDict, p
         plt.savefig("./" + figuresDirName + "/" + title + ".png")
         plt.close()
 
-    AcVec, NcVec, ArVec = [pd.DataFrame(columns=features)]*3
+    AcVec, NcVec, ArVec = pd.DataFrame(columns=features), pd.DataFrame(columns=features), pd.DataFrame(columns=features)
     if singleBatch:
         AcVec, NcVec, ArVec = TotalAutoCorr(paramsDict, patientsDf), TotalNormalizedCorr(paramsDict, patientsDf), ArPredictionLevel(paramsDict, patientsDf)
         title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_Ac"
