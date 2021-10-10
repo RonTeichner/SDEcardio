@@ -64,7 +64,7 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
     for population in populations:
         specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         if not (os.path.isdir("./" + specificPopulationFigureDirName)): os.makedirs("./" + specificPopulationFigureDirName)
-        patients = metaDataDf[metaDataDf["classification"] == population][["Id"]].values[:, 0]
+        patients = metaDataDf[metaDataDf["classification"] == population][["Id"]].to_numpy(dtype='float32')[:, 0]
         patientsDfSinglePopulation = patientsDf[patientsDf["Id"].isin(patients)]
         NvVecPopulation[population], CvOfSetPointsPopulation[population] = allPatientsAnalysis(matrixName, population, paramsDict, patientsDfSinglePopulation, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, specificPopulationFigureDirName, featuresShareUnits, enableSave)
 
@@ -72,7 +72,7 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
     for population in populations:
         specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         metaDataSinglePopulationDf = metaDataDf[metaDataDf["classification"] == population]
-        patients = metaDataSinglePopulationDf[["Id"]].values[:, 0]
+        patients = metaDataSinglePopulationDf[["Id"]].to_numpy(dtype='float32')[:, 0]
         patientsDfSinglePopulation = patientsDf[patientsDf["Id"].isin(patients)]
         CvVecPopulationDf = pd.DataFrame(columns=features)  #np.zeros((patients.shape[0], F))
         for p, patient in enumerate(patients):
@@ -90,7 +90,7 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
     for population in populations:
         specificPopulationFigureDirName = allPatientsFigureDirName + "/" + population
         metaDataSinglePopulationDf = metaDataDf[metaDataDf["classification"] == population]
-        patients = metaDataSinglePopulationDf[["Id"]].values[:, 0]
+        patients = metaDataSinglePopulationDf[["Id"]].to_numpy(dtype='float32')[:, 0]
         patientsDfSinglePopulation = patientsDf[patientsDf["Id"].isin(patients)]
         AcVecBatchPopulationDf, NcVecBatchPopulationDf, ArVecBatchPopulationDf, MeanVecBatchPopulationDf, VarVecBatchPopulationDf, CvVecBatchPopulationDf = [pd.DataFrame(columns=features)]*6
         MetaDataBatchPopulationDf = pd.DataFrame(columns=metaDataDf.columns)
@@ -203,15 +203,15 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, paramsDict, p
         plt.savefig("./" + figuresDirName + "/" + title + ".png")
         plt.close()
 
-        # std:
-        if singleBatch:
-            title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_Std"
-        else:
-            title = matrixName + "_" + populationName + "_" + PatientId + "_Std"
-        myBarPlot(np.sqrt(VarVec.squeeze()), title)
-        if enableSave:
-            plt.savefig("./" + figuresDirName + "/" + title + ".png")
-            plt.close()
+    # std:
+    if singleBatch:
+        title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_Std"
+    else:
+        title = matrixName + "_" + populationName + "_" + PatientId + "_Std"
+    myBarPlot(np.sqrt(VarVec.squeeze()), title)
+    if enableSave:
+        plt.savefig("./" + figuresDirName + "/" + title + ".png")
+        plt.close()
 
     AcVec, NcVec, ArVec = [pd.DataFrame(columns=features)]*3
     if singleBatch:
@@ -238,7 +238,7 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, paramsDict, p
         # plot trajectories:
         for f, feature in enumerate(features):
             title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_" + feature
-            myPlot(patientsDf["time"].values, patientsDf[feature].values, label=feature, title=title, xlabel='sec', ylabel=SigMatFeatureUnits[f])
+            myPlot(patientsDf["time"].to_numpy(dtype='float32'), patientsDf[feature].to_numpy(dtype='float32'), label=feature, title=title, xlabel='sec', ylabel=SigMatFeatureUnits[f])
             if enableSave:
                 plt.savefig("./" + figuresDirName + "/" + title + ".png")
                 plt.close()
@@ -246,8 +246,8 @@ def singlePatientAnalysis(singleBatch, matrixName, populationName, paramsDict, p
         # plot mean-normalized trajectories:
         title = matrixName + "_" + populationName + "_" + PatientId + "_" + batchId + "_" + "mean_normalized_trajectories"
         for f, feature in enumerate(features):
-            values = patientsDf[feature].values / patientsDf[feature].mean()
-            myPlot(patientsDf["time"].values, values, label=feature, title=title, xlabel='sec', ylabel=SigMatFeatureUnits[f])
+            values = patientsDf[feature].to_numpy(dtype='float32') / patientsDf[feature].mean()
+            myPlot(patientsDf["time"].to_numpy(dtype='float32'), values, label=feature, title=title, xlabel='sec', ylabel=SigMatFeatureUnits[f])
         if enableSave:
             plt.savefig("./" + figuresDirName + "/" + title + ".png")
             plt.close()
@@ -292,13 +292,13 @@ def MahalanobisDistance(paramsDict, patientsDf):
         for batch in singlePatientDf["batch"].unique():
             singleBatch = singlePatientDf[singlePatientDf["batch"] == batch]
             b = b + 1
-            MeanVec[b] = singleBatch[features].mean(axis=0).values
-            VarVec[b] = singleBatch[features].var(axis=0).values
+            MeanVec[b] = singleBatch[features].mean(axis=0).to_numpy(dtype='float32')
+            VarVec[b] = singleBatch[features].var(axis=0).to_numpy(dtype='float32')
 
             numerator = np.power(singleBatch[features] - MeanVec[b], 2)
             denominator = VarVec[b]
 
-            singleBatch[features] = np.sqrt(np.divide(numerator, denominator))
+            singleBatch[features] = np.sqrt(np.divide(numerator, denominator).to_numpy(dtype='float32'))            
             patientsMahDf = patientsMahDf.append(singleBatch)
 
     return patientsMahDf
@@ -321,7 +321,7 @@ def ArPredictionLevel(paramsDict, patientsDf):
                 singleBatchSingleFeature = singleBatch[['time', feature]]
                 singleBatchSingleFeatureResampled, fsNew = seriesResample(singleBatchSingleFeature)
                 nLags = int(np.floor(lags * fsNew))
-                ArVec[b, f] = ArPrediction(singleBatchSingleFeatureResampled[feature].values, nLags)[1]
+                ArVec[b, f] = ArPrediction(singleBatchSingleFeatureResampled[feature].to_numpy(dtype='float32'), nLags)[1]
 
     ArVec = pd.DataFrame(ArVec, columns=features)
 
@@ -330,7 +330,7 @@ def ArPredictionLevel(paramsDict, patientsDf):
 def seriesResample(patientDf):
     time = patientDf.columns.to_list()[0]
     feature = patientDf.columns.to_list()[-1]
-    tVec, data = patientDf[time].values, patientDf[feature].values
+    tVec, data = patientDf[time].to_numpy(dtype='float32'), patientDf[feature].to_numpy(dtype='float32')
 
     # we choose the new sampling frequency to be the most popular sampling frequency in the data
     # and we choose the sampling phase such that as many original samples are used in the resampled signal
@@ -376,7 +376,7 @@ def TotalAutoCorr(paramsDict, patientsDf):
                 minLag, maxLag = int(- np.min((N - 2, nLagSampled))), int(1 + np.min((N - 2, nLagSampled)))
                 summed = 0
                 for L in range(minLag, maxLag):
-                    AcLagVec = AutoCorrSpecificLag(singleBatchSingleFeatureResampled[feature].values[:, None, None], L)
+                    AcLagVec = AutoCorrSpecificLag(singleBatchSingleFeatureResampled[feature].to_numpy(dtype='float32')[:, None, None], L)
                     i0 = np.max((L, 0))
                     i1 = N - 1 + np.min((0, L))
                     weight = (1 + i1 - i0) / np.power(N, 2)
@@ -407,7 +407,7 @@ def TotalNormalizedCorr(paramsDict, patientsDf):
                 minLag, maxLag = int(- np.min((N - 2, nLagSampled))), int(1 + np.min((N - 2, nLagSampled)))
                 summed = 0
                 for L in range(minLag, maxLag):
-                    NcLagVec = NormalizedCorrelationSpecificLag(singleBatchSingleFeatureResampled[feature].values[:, None, None], L)
+                    NcLagVec = NormalizedCorrelationSpecificLag(singleBatchSingleFeatureResampled[feature].to_numpy(dtype='float32')[:, None, None], L)
                     i0 = np.max((L, 0))
                     i1 = N - 1 + np.min((0, L))
                     weight = (1 + i1 - i0) / np.power(N, 2)
@@ -477,8 +477,8 @@ def CoefVar(paramsDict, patientsDf):
         for batch in singlePatientDf["batch"].unique():
             singleBatch = singlePatientDf[singlePatientDf["batch"] == batch]
             b = b + 1
-            MeanVec[b] = singleBatch[features].mean(axis=0).values
-            VarVec[b] = singleBatch[features].var(axis=0).values
+            MeanVec[b] = singleBatch[features].mean(axis=0).to_numpy(dtype='float32')
+            VarVec[b] = singleBatch[features].var(axis=0).to_numpy(dtype='float32')
 
     MeanVec = pd.DataFrame(MeanVec, columns=features)
     VarVec = pd.DataFrame(VarVec, columns=features)
@@ -498,7 +498,7 @@ def CoefVarOfSetPoints(paramsDict, patientsDf):
         for batch in singlePatientDf["batch"].unique():
             singleBatch = singlePatientDf[singlePatientDf["batch"] == batch]
             b = b + 1
-            MeanVec[b] = singleBatch[features].mean(axis=0).values
+            MeanVec[b] = singleBatch[features].mean(axis=0).to_numpy(dtype='float32')
 
     MeanVec = pd.DataFrame(MeanVec, columns=features)
     MeansOfMeansVec = MeanVec.mean(axis=0)
@@ -525,7 +525,7 @@ def NormalizedVariacne(paramsDict, patientsDf):
         for batch in singlePatientDf["batch"].unique():
             singleBatch = singlePatientDf[singlePatientDf["batch"] == batch]
             b = b + 1
-            MeanVec[b] = singleBatch[features].mean(axis=0).values
+            MeanVec[b] = singleBatch[features].mean(axis=0).to_numpy(dtype='float32')
 
     MeanVec = pd.DataFrame(MeanVec, columns=features)
     VarOfMeansVec = MeanVec.var(axis=0)
@@ -574,7 +574,7 @@ def cdfPlot(patientsDf, featuresShareUnits, matrixName, populationName, patientI
         plt.savefig("./" + figuresDirName + "/" + title + ".png")
         plt.close()
 
-    binsMat, CdfMat = CalcCDF(patientsDf[features].values[:, None, :])
+    binsMat, CdfMat = CalcCDF(patientsDf[features].to_numpy(dtype='float32')[:, None, :])
 
     if featuresShareUnits:  # plot all cdf curves in the same figure
         plt.figure()
@@ -651,7 +651,7 @@ def myBarPlot(values, title):
     fig.suptitle(title)
     scales = ['linear', 'log']
     for i, scale in enumerate(scales):
-        axs[i].bar(values.index, values.values)
+        axs[i].bar(values.index, values.to_numpy(dtype='float32'))
         #axs[i].set_title(scale)
         axs[i].grid()
         axs[i].set_yscale(scale)
