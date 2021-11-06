@@ -110,6 +110,12 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
                 CvVecBatchPopulationDf, MeanVecBatchPopulationDf, VarVecBatchPopulationDf, AcVecBatchPopulationDf, NcVecBatchPopulationDf, ArVecBatchPopulationDf = CvVecBatchPopulationDf.append(CvVec), MeanVecBatchPopulationDf.append(MeanVec), VarVecBatchPopulationDf.append(VarVec), AcVecBatchPopulationDf.append(AcVecBatchPopulation), NcVecBatchPopulationDf.append(NcVecBatchPopulation), ArVecBatchPopulationDf.append(ArVecBatchPopulation)
                 MetaDataBatchPopulationDf = MetaDataBatchPopulationDf.append(metaDataSinglePopulationDfSinglePatient)
 
+        # plot CDF, mean, std  of Mean values for population:
+        cdfPlot(MeanVecBatchPopulationDf, True, matrixName, population, 'Mean', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+
+        # plot CDF, mean, std  of Std values for population:
+        cdfPlot(VarVecBatchPopulationDf, True, matrixName, population, 'Var', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+
         # plot CDF, mean, std  of Ac values for population:
         cdfPlot(AcVecBatchPopulationDf, True, matrixName, population, 'AC', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
 
