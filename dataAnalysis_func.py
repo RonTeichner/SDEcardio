@@ -6,6 +6,7 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 
 def dataAnalysis(paramsDict, patientsDf, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, figuresDirName, enableSave=True):
+    enableMahalanobis = False
     enableAcSw = False
 
     paramsDict["slidingWindowSize"], paramsDict["slidingWindowsWingap"], paramsDict["autoCorrMaxLag"], paramsDict["Arlags"] = int(paramsDict["slidingWindowSize"]), int(paramsDict["slidingWindowsWingap"]), int(paramsDict["autoCorrMaxLag"]), int(paramsDict["Arlags"])
@@ -24,12 +25,13 @@ def dataAnalysis(paramsDict, patientsDf, metaDataDf, SigMatFeatureUnits, patient
     if not (os.path.isdir("./" + rawDataFiguresDirName)): os.makedirs("./" + rawDataFiguresDirName)
     singleMatAnalysis("rawData", paramsDict, patientsDf, metaDataDf, SigMatFeatureUnits, patientMetaDataTextBox, rawDataFiguresDirName, featuresShareUnits=False, enableSave=enableSave)
 
-    print('starting Mahalanobis analysis')
-    patientsMahDf = MahalanobisDistance(paramsDict, patientsDf)
-    mahalanobisFiguresDirName = figuresDirName + "/mahalanobis"
-    if not (os.path.isdir("./" + mahalanobisFiguresDirName)): os.makedirs("./" + mahalanobisFiguresDirName)
-    MahMatFeatureUnits = ['']*len(SigMatFeatureUnits)
-    singleMatAnalysis("Mahalanobis", paramsDict, patientsMahDf, metaDataDf, MahMatFeatureUnits, patientMetaDataTextBox, mahalanobisFiguresDirName, featuresShareUnits=True, enableSave=enableSave)
+    if enableMahalanobis:
+        print('starting Mahalanobis analysis')
+        patientsMahDf = MahalanobisDistance(paramsDict, patientsDf)
+        mahalanobisFiguresDirName = figuresDirName + "/mahalanobis"
+        if not (os.path.isdir("./" + mahalanobisFiguresDirName)): os.makedirs("./" + mahalanobisFiguresDirName)
+        MahMatFeatureUnits = ['']*len(SigMatFeatureUnits)
+        singleMatAnalysis("Mahalanobis", paramsDict, patientsMahDf, metaDataDf, MahMatFeatureUnits, patientMetaDataTextBox, mahalanobisFiguresDirName, featuresShareUnits=True, enableSave=enableSave)
 
     if enableAcSw:
         print('starting auto-corr analysis')
@@ -111,10 +113,10 @@ def singleMatAnalysis(matrixName, paramsDict, patientsDf, metaDataDf, SigMatFeat
                 MetaDataBatchPopulationDf = MetaDataBatchPopulationDf.append(metaDataSinglePopulationDfSinglePatient)
 
         # plot CDF, mean, std  of Mean values for population:
-        cdfPlot(MeanVecBatchPopulationDf, True, matrixName, population, 'Mean', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+        cdfPlot(MeanVecBatchPopulationDf, False, matrixName, population, 'Mean', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
 
         # plot CDF, mean, std  of Std values for population:
-        cdfPlot(VarVecBatchPopulationDf, True, matrixName, population, 'Var', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
+        cdfPlot(VarVecBatchPopulationDf, False, matrixName, population, 'Var', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
 
         # plot CDF, mean, std  of Ac values for population:
         cdfPlot(AcVecBatchPopulationDf, True, matrixName, population, 'AC', '', ['']*len(SigMatFeatureUnits), specificPopulationFigureDirName, enableSave)
