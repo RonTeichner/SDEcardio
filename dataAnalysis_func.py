@@ -640,7 +640,7 @@ def myPlot(x, y, label='', title='', xlabel='', ylabel=''):
     plt.title(title)
 
 def myScatter(x, y, label='', title='', xlabel='', ylabel=''):
-    pearsonCorr = round(pd.Series(x).corr(pd.Series(y)), 2)
+    pearsonCorr = round(pd.Series(x).astype('float64').corr(pd.Series(y).astype('float64')), 2)
     title = title + ' p.c=' + str(pearsonCorr)
     plt.scatter(x, y, label=label)
     plt.legend()
